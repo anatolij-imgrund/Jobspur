@@ -15,6 +15,7 @@ const light = {
   accent: '#1F6B57',
   accentInk: '#FFFFFF',
   accentSoft: '#E1EEE9',
+  danger: '#A23B30',
   status: {
     applied: { fg: '#3E5468', bg: '#E6ECF1' },
     confirmed: { fg: '#3E5468', bg: '#E6ECF1' },
@@ -34,6 +35,7 @@ const dark: typeof light = {
   accent: '#5EBFA3',
   accentInk: '#0F1513',
   accentSoft: '#1E3530',
+  danger: '#E8988D',
   status: {
     applied: { fg: '#A9BFD2', bg: '#223039' },
     confirmed: { fg: '#A9BFD2', bg: '#223039' },
