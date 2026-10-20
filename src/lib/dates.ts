@@ -61,6 +61,28 @@ export function formatDaysAgo(days: number): string {
   return `vor ${days} Tagen`;
 }
 
+export type DateRange = { from: string; to: string };
+
+/** Vorgefertigte Zeiträume für den Nachweis, bezogen auf `today`. */
+export function presetRange(
+  preset: 'thisMonth' | 'lastMonth' | 'last4Weeks',
+  today = new Date(),
+): DateRange {
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  switch (preset) {
+    case 'thisMonth':
+      return { from: toIsoDate(new Date(y, m, 1)), to: toIsoDate(today) };
+    case 'lastMonth':
+      // Tag 0 des aktuellen Monats = letzter Tag des Vormonats
+      return { from: toIsoDate(new Date(y, m - 1, 1)), to: toIsoDate(new Date(y, m, 0)) };
+    case 'last4Weeks': {
+      const from = new Date(y, m, today.getDate() - 27);
+      return { from: toIsoDate(from), to: toIsoDate(today) };
+    }
+  }
+}
+
 export function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }

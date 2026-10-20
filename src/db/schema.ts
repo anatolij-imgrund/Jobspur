@@ -7,7 +7,7 @@ export const DATABASE_NAME = 'bewerbungen.db';
  * `if (version < N)`-Block ergänzen. Alte Blöcke nie verändern:
  * Sie laufen auf Geräten, die noch eine ältere Version haben.
  */
-const LATEST_VERSION = 1;
+const LATEST_VERSION = 2;
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
   // Gilt pro Verbindung, deshalb bei jedem Start setzen.
@@ -49,6 +49,24 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
       CREATE TABLE settings (
         key   TEXT PRIMARY KEY NOT NULL,
         value TEXT
+      );
+    `);
+  }
+
+  if (version < 2) {
+    // Stellen, an die Nachweise gehen (Agentur, Jobcenter, …)
+    await db.execAsync(`
+      CREATE TABLE recipients (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind            TEXT NOT NULL,
+        name            TEXT NOT NULL,
+        customer_number TEXT,
+        bg_number       TEXT,
+        contact_person  TEXT,
+        street          TEXT,
+        zip             TEXT,
+        city            TEXT,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
   }
