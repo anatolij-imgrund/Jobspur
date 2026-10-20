@@ -68,6 +68,8 @@ export function FilterBar({ search, onSearchChange, status, onStatusChange }: Pr
             </Pressable>
           );
         })}
+        {/* Android ignoriert paddingRight in horizontalen Listen, daher ein Abstandhalter. */}
+        <View style={styles.endSpacer} />
       </ScrollView>
     </View>
   );
@@ -86,7 +88,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   input: { flex: 1, ...type.body, paddingVertical: space.sm },
-  chips: { paddingHorizontal: space.lg, gap: space.sm },
+  chips: { paddingLeft: space.lg, gap: space.sm },
+  endSpacer: { width: space.lg - space.sm },
   chip: {
     paddingHorizontal: space.md,
     paddingVertical: 7,

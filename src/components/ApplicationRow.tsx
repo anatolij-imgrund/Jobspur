@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatDate } from '@/lib/dates';
@@ -21,19 +21,20 @@ export function ApplicationRow({ application }: Props) {
     .filter(Boolean)
     .join(', ');
 
+  // Bewusst kein <Link asChild>: Link reicht einen Stil als Funktion
+  // auf Android nicht an die Pressable weiter, dann fehlen Padding und Layout.
   return (
-    <Link
-      href={{ pathname: '/bewerbung/[id]', params: { id: String(application.id) } }}
-      asChild
+    <Pressable
+      onPress={() =>
+        router.push({ pathname: '/bewerbung/[id]', params: { id: String(application.id) } })
+      }
+      accessibilityRole="button"
+      accessibilityLabel={`${application.company}, ${application.position}`}
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? theme.accentSoft : 'transparent',
+      })}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${application.company}, ${application.position}`}
-        style={({ pressed }) => [
-          styles.row,
-          { backgroundColor: pressed ? theme.accentSoft : theme.surface },
-        ]}
-      >
+      <View style={styles.row}>
         <View style={styles.main}>
           <Text style={[styles.company, { color: theme.ink }]} numberOfLines={1}>
             {application.company}
@@ -46,8 +47,8 @@ export function ApplicationRow({ application }: Props) {
           </Text>
         </View>
         <StatusBadge status={application.status} />
-      </Pressable>
-    </Link>
+      </View>
+    </Pressable>
   );
 }
 
