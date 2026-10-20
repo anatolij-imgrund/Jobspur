@@ -25,7 +25,11 @@ export default function RootLayout() {
           name="bewerbung/neu"
           options={{ title: 'Neue Bewerbung', presentation: 'modal' }}
         />
-        <Stack.Screen name="bewerbung/[id]" options={{ title: 'Bewerbung' }} />
+        <Stack.Screen name="bewerbung/[id]" options={{ title: '' }} />
+        <Stack.Screen
+          name="bewerbung/bearbeiten/[id]"
+          options={{ title: 'Bewerbung bearbeiten', presentation: 'modal' }}
+        />
       </Stack>
     </SQLiteProvider>
   );

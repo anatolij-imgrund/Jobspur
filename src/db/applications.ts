@@ -6,6 +6,7 @@ import type {
   NewApplication,
   Source,
   Status,
+  StatusEvent,
 } from '@/types/application';
 
 /** So liegt eine Zeile in der Datenbank (snake_case). */
@@ -126,6 +127,165 @@ export async function createApplication(
   });
 
   return id;
+}
+
+/**
+ * Ändert die Angaben einer Bewerbung. Verschiebt sich das Bewerbungsdatum,
+ * wandert der erste Eintrag im Verlauf mit.
+ */
+export async function updateApplication(
+  db: SQLiteDatabase,
+  id: number,
+  input: NewApplication,
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE applications SET
+         company = ?, position = ?, applied_at = ?, channel = ?, source = ?,
+         location = ?, contact_name = ?, contact_email = ?, job_url = ?, notes = ?,
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      input.company.trim(),
+      input.position.trim(),
+      input.appliedAt,
+      input.channel,
+      input.source,
+      input.location,
+      input.contactName,
+      input.contactEmail,
+      input.jobUrl,
+      input.notes,
+      id,
+    );
+    await db.runAsync(
+      `UPDATE status_events SET date = ?
+       WHERE id = (SELECT MIN(id) FROM status_events WHERE application_id = ?)`,
+      input.appliedAt,
+      id,
+    );
+    await syncCurrentStatus(db, id);
+  });
+}
+
+/** Löscht die Bewerbung samt Verlauf (ON DELETE CASCADE). */
+export async function deleteApplication(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM applications WHERE id = ?', id);
+}
+
+// ── Statusverlauf ──────────────────────────────────────────────────
+
+type StatusEventRow = {
+  id: number;
+  application_id: number;
+  status: string;
+  date: string;
+  note: string | null;
+};
+
+/** Verlauf einer Bewerbung, neuester Eintrag zuerst. */
+export async function listStatusEvents(
+  db: SQLiteDatabase,
+  applicationId: number,
+): Promise<StatusEvent[]> {
+  const rows = await db.getAllAsync<StatusEventRow>(
+    `SELECT * FROM status_events WHERE application_id = ?
+     ORDER BY date DESC, id DESC`,
+    applicationId,
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    applicationId: r.application_id,
+    status: r.status as Status,
+    date: r.date,
+    note: r.note,
+  }));
+}
+
+/**
+ * Setzt den aktuellen Status auf den jüngsten Eintrag im Verlauf.
+ * Bei gleichem Datum gewinnt der später eingetragene.
+ */
+async function syncCurrentStatus(db: SQLiteDatabase, applicationId: number): Promise<void> {
+  await db.runAsync(
+    `UPDATE applications SET
+       status = COALESCE(
+         (SELECT status FROM status_events WHERE application_id = ?
+          ORDER BY date DESC, id DESC LIMIT 1),
+         'applied'),
+       updated_at = datetime('now')
+     WHERE id = ?`,
+    applicationId,
+    applicationId,
+  );
+}
+
+export async function addStatusEvent(
+  db: SQLiteDatabase,
+  applicationId: number,
+  event: { status: Status; date: string; note: string | null },
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      'INSERT INTO status_events (application_id, status, date, note) VALUES (?, ?, ?, ?)',
+      applicationId,
+      event.status,
+      event.date,
+      event.note,
+    );
+    await syncCurrentStatus(db, applicationId);
+  });
+}
+
+/**
+ * Entfernt einen Eintrag aus dem Verlauf. Der erste Eintrag
+ * („Beworben“) gehört zur Bewerbung selbst und bleibt stehen.
+ */
+export async function deleteStatusEvent(
+  db: SQLiteDatabase,
+  applicationId: number,
+  eventId: number,
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `DELETE FROM status_events
+       WHERE id = ? AND application_id = ?
+         AND id <> (SELECT MIN(id) FROM status_events WHERE application_id = ?)`,
+      eventId,
+      applicationId,
+      applicationId,
+    );
+    await syncCurrentStatus(db, applicationId);
+  });
+}
+
+/**
+ * Frühestes Datum eines späteren Verlaufseintrags (ohne „Beworben“).
+ * Das Bewerbungsdatum darf nicht danach liegen.
+ */
+export async function getEarliestFollowUpDate(
+  db: SQLiteDatabase,
+  applicationId: number,
+): Promise<string | null> {
+  const row = await db.getFirstAsync<{ d: string | null }>(
+    `SELECT MIN(date) AS d FROM status_events
+     WHERE application_id = ?
+       AND id <> (SELECT MIN(id) FROM status_events WHERE application_id = ?)`,
+    applicationId,
+    applicationId,
+  );
+  return row?.d ?? null;
+}
+
+/** Id des ersten Verlaufseintrags; der lässt sich nicht löschen. */
+export async function getFirstStatusEventId(
+  db: SQLiteDatabase,
+  applicationId: number,
+): Promise<number | null> {
+  const row = await db.getFirstAsync<{ id: number | null }>(
+    'SELECT MIN(id) AS id FROM status_events WHERE application_id = ?',
+    applicationId,
+  );
+  return row?.id ?? null;
 }
 
 /** ISO-Daten (YYYY-MM-DD) aller Bewerbungen im angegebenen Monat. */

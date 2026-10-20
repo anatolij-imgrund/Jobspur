@@ -45,6 +45,22 @@ export function monthKey(iso: string): string {
   return iso.slice(0, 7);
 }
 
+/** Ganze Kalendertage von `iso` bis heute (heute = 0). */
+export function daysSince(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  const then = Date.UTC(y, m - 1, d);
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((today - then) / 86_400_000);
+}
+
+/** 0 → "heute", 1 → "gestern", n → "vor n Tagen" */
+export function formatDaysAgo(days: number): string {
+  if (days <= 0) return 'heute';
+  if (days === 1) return 'gestern';
+  return `vor ${days} Tagen`;
+}
+
 export function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }

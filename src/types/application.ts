@@ -37,6 +37,15 @@ export type NewApplication = Omit<
   'id' | 'status' | 'createdAt' | 'updatedAt'
 > & { status?: Status };
 
+export type StatusEvent = {
+  id: number;
+  applicationId: number;
+  status: Status;
+  /** ISO-Datum */
+  date: string;
+  note: string | null;
+};
+
 export const STATUS_LABELS: Record<Status, string> = {
   applied: 'Beworben',
   confirmed: 'Eingang bestätigt',

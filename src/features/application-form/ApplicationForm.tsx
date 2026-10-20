@@ -18,6 +18,7 @@ import { ChoiceGroup } from '@/components/form/ChoiceGroup';
 import { DateField } from '@/components/form/DateField';
 import { Field } from '@/components/form/Field';
 import { TextField } from '@/components/form/TextField';
+import { formatDate } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
 import { CHANNEL_LABELS, CHANNELS, SOURCE_LABELS, SOURCES } from '@/types/application';
 
@@ -28,13 +29,23 @@ type Props = {
   defaultValues: ApplicationFormValues;
   submitLabel: string;
   onSubmit: (values: ApplicationFormValues) => Promise<void>;
+  /**
+   * Beim Bearbeiten: Datum des frühesten späteren Verlaufseintrags.
+   * Das Bewerbungsdatum darf nicht danach liegen.
+   */
+  latestAppliedAt?: string | null;
 };
 
 /**
  * Formular für neue und bestehende Bewerbungen. Pflichtfelder stehen oben,
  * alles, was beim Eintragen oft noch fehlt, darunter unter „Weitere Angaben“.
  */
-export function ApplicationForm({ defaultValues, submitLabel, onSubmit }: Props) {
+export function ApplicationForm({
+  defaultValues,
+  submitLabel,
+  onSubmit,
+  latestAppliedAt,
+}: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -63,6 +74,12 @@ export function ApplicationForm({ defaultValues, submitLabel, onSubmit }: Props)
   // ein Fehler im Formular steht, bleibt isSubmitSuccessful false und die
   // Rückfrage beim Verlassen aktiv.
   const submit = handleSubmit(async (values) => {
+    if (latestAppliedAt && values.appliedAt > latestAppliedAt) {
+      setError('appliedAt', {
+        message: `Im Verlauf steht schon ein Eintrag vom ${formatDate(latestAppliedAt)}. Das Bewerbungsdatum muss davor liegen.`,
+      });
+      return;
+    }
     try {
       await onSubmit(values);
     } catch (error) {
@@ -136,6 +153,7 @@ export function ApplicationForm({ defaultValues, submitLabel, onSubmit }: Props)
                 value={field.value}
                 onChange={field.onChange}
                 invalid={!!errors.appliedAt}
+                accessibilityLabel="Beworben am"
               />
             )}
           />

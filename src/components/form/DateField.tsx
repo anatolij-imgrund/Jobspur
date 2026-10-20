@@ -10,6 +10,9 @@ type Props = {
   value: string;
   onChange: (iso: string) => void;
   invalid?: boolean;
+  /** Frühestes wählbares Datum (ISO); spätestes ist immer heute. */
+  minimumDate?: string;
+  accessibilityLabel?: string;
 };
 
 function parseIso(iso: string): Date {
@@ -27,10 +30,17 @@ function relativeLabel(iso: string): string | null {
 }
 
 /** Datumsfeld mit Schnellwahl „Heute“ und „Gestern“ und Kalender. */
-export function DateField({ value, onChange, invalid }: Props) {
+export function DateField({
+  value,
+  onChange,
+  invalid,
+  minimumDate,
+  accessibilityLabel = 'Datum',
+}: Props) {
   const theme = useTheme();
   const [iosOpen, setIosOpen] = useState(false);
   const relative = relativeLabel(value);
+  const minDate = minimumDate ? parseIso(minimumDate) : undefined;
 
   const openPicker = () => {
     if (Platform.OS === 'android') {
@@ -38,6 +48,7 @@ export function DateField({ value, onChange, invalid }: Props) {
         value: parseIso(value),
         mode: 'date',
         maximumDate: new Date(),
+        minimumDate: minDate,
         firstDayOfWeek: 1,
         onValueChange: (_event, date) => onChange(toIsoDate(date)),
       });
@@ -51,16 +62,20 @@ export function DateField({ value, onChange, invalid }: Props) {
     d.setDate(d.getDate() - daysBack);
     const iso = toIsoDate(d);
     const selected = iso === value;
+    // ISO-Daten lassen sich als Text vergleichen.
+    const disabled = minimumDate !== undefined && iso < minimumDate;
     return (
       <Pressable
         onPress={() => onChange(iso)}
+        disabled={disabled}
         accessibilityRole="button"
-        accessibilityState={{ selected }}
+        accessibilityState={{ selected, disabled }}
         style={[
           styles.shortcut,
           selected
             ? { backgroundColor: theme.accentSoft, borderColor: theme.accent }
             : { borderColor: theme.line },
+          disabled && { opacity: 0.4 },
         ]}
       >
         <Text style={[styles.shortcutText, { color: selected ? theme.accent : theme.ink }]}>
@@ -76,7 +91,7 @@ export function DateField({ value, onChange, invalid }: Props) {
         <Pressable
           onPress={openPicker}
           accessibilityRole="button"
-          accessibilityLabel={`Datum der Bewerbung: ${formatDate(value)}. Antippen zum Ändern`}
+          accessibilityLabel={`${accessibilityLabel}: ${formatDate(value)}. Antippen zum Ändern`}
           style={[
             styles.dateButton,
             {
@@ -98,6 +113,7 @@ export function DateField({ value, onChange, invalid }: Props) {
           mode="date"
           display="inline"
           maximumDate={new Date()}
+          minimumDate={minDate}
           accentColor={theme.accent}
           onValueChange={(_event, date) => onChange(toIsoDate(date))}
         />
