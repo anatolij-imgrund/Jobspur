@@ -21,6 +21,7 @@ import { space, type, useTheme } from '@/theme';
 import {
   type Application,
   CHANNEL_LABELS,
+  isFinal,
   SOURCE_LABELS,
   type StatusEvent,
 } from '@/types/application';
@@ -148,7 +149,7 @@ export default function BewerbungDetailScreen() {
             <Text style={[styles.statusSince, { color: theme.muted }]}>
               {waiting && days >= 14
                 ? `seit ${days} Tagen ohne Antwort`
-                : `seit ${formatDate(lastEvent.date)}`}
+                : `${isFinal(app.status) ? 'am' : 'seit'} ${formatDate(lastEvent.date)}`}
             </Text>
           </View>
         </View>
@@ -165,10 +166,12 @@ export default function BewerbungDetailScreen() {
         )}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.ink }]}>Status ändern</Text>
+          <Text style={[styles.sectionTitle, { color: theme.ink }]}>
+            {isFinal(app.status) ? 'Status' : 'Status ändern'}
+          </Text>
           <StatusChanger
             current={app.status}
-            appliedAt={app.appliedAt}
+            currentSince={lastEvent.date}
             onSave={async (event) => {
               await addStatusEvent(db, id, event);
               await load();

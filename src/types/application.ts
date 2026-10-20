@@ -70,3 +70,24 @@ export const SOURCE_LABELS: Record<Source, string> = {
 
 /** Status, bei denen die Bewerbung noch läuft. */
 export const OPEN_STATUSES: readonly Status[] = ['applied', 'confirmed', 'interview'];
+
+/** Endzustände: Danach lässt sich kein weiterer Status setzen. */
+export const FINAL_STATUSES: readonly Status[] = ['offer', 'rejected'];
+
+export function isFinal(status: Status): boolean {
+  return FINAL_STATUSES.includes(status);
+}
+
+/**
+ * Welcher Status nach welchem sinnvoll ist. „Eingang bestätigt“ nach einem
+ * Gespräch ergibt keinen Sinn; nach „Keine Antwort“ kann sich die Firma
+ * aber doch noch melden.
+ */
+export const NEXT_STATUSES: Record<Status, readonly Status[]> = {
+  applied: ['confirmed', 'interview', 'offer', 'rejected', 'no_response'],
+  confirmed: ['interview', 'offer', 'rejected', 'no_response'],
+  interview: ['offer', 'rejected', 'no_response'],
+  no_response: ['confirmed', 'interview', 'offer', 'rejected'],
+  offer: [],
+  rejected: [],
+};

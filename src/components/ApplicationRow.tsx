@@ -12,6 +12,10 @@ type Props = { application: Application };
 /** Eine Zeile in der Liste: Firma, Stelle, Datum und Weg, Status rechts. */
 export function ApplicationRow({ application }: Props) {
   const theme = useTheme();
+  // Abgeschlossene Bewerbungen treten zurück, offene fallen ins Auge.
+  // Die Zusage bleibt kräftig: Die will man sehen.
+  const dimmed = application.status === 'rejected';
+  const ink = dimmed ? theme.muted : theme.ink;
   const meta = [
     formatDate(application.appliedAt),
     CHANNEL_LABELS[application.channel],
@@ -36,10 +40,10 @@ export function ApplicationRow({ application }: Props) {
     >
       <View style={styles.row}>
         <View style={styles.main}>
-          <Text style={[styles.company, { color: theme.ink }]} numberOfLines={1}>
+          <Text style={[styles.company, { color: ink }]} numberOfLines={1}>
             {application.company}
           </Text>
-          <Text style={[styles.position, { color: theme.ink }]} numberOfLines={1}>
+          <Text style={[styles.position, { color: ink }]} numberOfLines={1}>
             {application.position}
           </Text>
           <Text style={[styles.meta, { color: theme.muted }]} numberOfLines={1}>

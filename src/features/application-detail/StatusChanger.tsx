@@ -6,12 +6,12 @@ import { Field } from '@/components/form/Field';
 import { TextField } from '@/components/form/TextField';
 import { formatDate, toIsoDate } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
-import { STATUS_LABELS, STATUSES, type Status } from '@/types/application';
+import { NEXT_STATUSES, STATUS_LABELS, type Status } from '@/types/application';
 
 type Props = {
   current: Status;
-  /** Bewerbungsdatum: Ein neuer Status kann nicht davor liegen. */
-  appliedAt: string;
+  /** Datum des aktuellen Status: Ein neuer kann nicht davor liegen. */
+  currentSince: string;
   onSave: (event: { status: Status; date: string; note: string | null }) => Promise<void>;
 };
 
@@ -25,7 +25,7 @@ const NOTE_PLACEHOLDER: Partial<Record<Status, string>> = {
  * Status wählen, dann klappt darunter Datum und Notiz auf.
  * Erst „Status speichern“ schreibt den Eintrag in den Verlauf.
  */
-export function StatusChanger({ current, appliedAt, onSave }: Props) {
+export function StatusChanger({ current, currentSince, onSave }: Props) {
   const theme = useTheme();
   const [selected, setSelected] = useState<Status | null>(null);
   const [date, setDate] = useState(() => toIsoDate(new Date()));
@@ -33,7 +33,7 @@ export function StatusChanger({ current, appliedAt, onSave }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const options = STATUSES.filter((s) => s !== current && s !== 'applied');
+  const options = NEXT_STATUSES[current];
 
   const reset = () => {
     setSelected(null);
@@ -44,8 +44,10 @@ export function StatusChanger({ current, appliedAt, onSave }: Props) {
 
   const save = async () => {
     if (!selected) return;
-    if (date < appliedAt) {
-      setError(`Das Datum liegt vor der Bewerbung am ${formatDate(appliedAt)}.`);
+    if (date < currentSince) {
+      setError(
+        `Das Datum liegt vor „${STATUS_LABELS[current]}“ am ${formatDate(currentSince)}.`,
+      );
       return;
     }
     setSaving(true);
@@ -59,6 +61,18 @@ export function StatusChanger({ current, appliedAt, onSave }: Props) {
       setSaving(false);
     }
   };
+
+  if (options.length === 0) {
+    return (
+      <View style={[styles.closed, { backgroundColor: theme.surface, borderColor: theme.line }]}>
+        <Text style={[styles.closedTitle, { color: theme.ink }]}>Bewerbung abgeschlossen</Text>
+        <Text style={[styles.closedText, { color: theme.muted }]}>
+          Nach „{STATUS_LABELS[current]}“ folgt kein weiterer Status. Falls sich doch noch
+          etwas tut, entferne „{STATUS_LABELS[current]}“ unten im Verlauf.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrap}>
@@ -104,7 +118,7 @@ export function StatusChanger({ current, appliedAt, onSave }: Props) {
                 setDate(iso);
                 setError(null);
               }}
-              minimumDate={appliedAt}
+              minimumDate={currentSince}
               invalid={!!error}
               accessibilityLabel={`Datum für ${STATUS_LABELS[selected]}`}
             />
@@ -174,4 +188,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveText: { ...type.body, fontWeight: '600' },
+  closed: {
+    padding: space.lg,
+    gap: space.xs,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  closedTitle: { ...type.body, fontWeight: '600' },
+  closedText: { ...type.small, lineHeight: 19 },
 });
