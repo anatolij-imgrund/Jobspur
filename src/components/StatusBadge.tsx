@@ -3,13 +3,14 @@ import { StyleSheet, Text, View } from 'react-native';
 import { radius, space, type, useTheme } from '@/theme';
 import { STATUS_LABELS, type Status } from '@/types/application';
 
-export function StatusBadge({ status }: { status: Status }) {
+/** `label` ersetzt den Standardtext, z. B. „Gespräch 05.11.“ */
+export function StatusBadge({ status, label }: { status: Status; label?: string }) {
   const theme = useTheme();
   const colors = theme.status[status];
 
   return (
     <View style={[styles.badge, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.text, { color: colors.fg }]}>{STATUS_LABELS[status]}</Text>
+      <Text style={[styles.text, { color: colors.fg }]}>{label ?? STATUS_LABELS[status]}</Text>
     </View>
   );
 }

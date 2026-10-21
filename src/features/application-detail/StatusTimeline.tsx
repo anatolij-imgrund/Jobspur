@@ -1,9 +1,9 @@
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/Icon';
-import { formatDate } from '@/lib/dates';
-import { space, type, useTheme } from '@/theme';
-import { STATUS_LABELS, type StatusEvent } from '@/types/application';
+import { formatDate, toLocalDateTime } from '@/lib/dates';
+import { radius, space, type, useTheme } from '@/theme';
+import { INTERVIEW_MODE_LABELS, STATUS_LABELS, type StatusEvent } from '@/types/application';
 
 type Props = {
   /** Neuester Eintrag zuerst. */
@@ -17,10 +17,16 @@ type Props = {
 export function StatusTimeline({ events, firstEventId, onDelete }: Props) {
   const theme = useTheme();
 
+  const now = Date.now();
+  const isPlanned = (e: StatusEvent) =>
+    e.status === 'interview' && toLocalDateTime(e.date, e.time ?? '23:59').getTime() > now;
+
   const confirmDelete = (event: StatusEvent) => {
     Alert.alert(
-      'Eintrag entfernen?',
-      `„${STATUS_LABELS[event.status]}“ vom ${formatDate(event.date)} wird aus dem Verlauf entfernt.`,
+      isPlanned(event) ? 'Termin entfernen?' : 'Eintrag entfernen?',
+      isPlanned(event)
+        ? `Das Gespräch am ${formatDate(event.date)} wird samt Erinnerung entfernt.`
+        : `„${STATUS_LABELS[event.status]}“ vom ${formatDate(event.date)} wird aus dem Verlauf entfernt.`,
       [
         { text: 'Abbrechen', style: 'cancel' },
         { text: 'Entfernen', style: 'destructive', onPress: () => onDelete(event) },
@@ -35,6 +41,11 @@ export function StatusTimeline({ events, firstEventId, onDelete }: Props) {
         const last = index === events.length - 1;
         const colors = theme.status[event.status];
         const removable = event.id !== firstEventId;
+        const planned = isPlanned(event);
+        const details = [
+          event.time && `${event.time} Uhr`,
+          event.mode && INTERVIEW_MODE_LABELS[event.mode],
+        ].filter(Boolean);
 
         return (
           <View key={event.id} style={styles.item}>
@@ -61,6 +72,11 @@ export function StatusTimeline({ events, firstEventId, onDelete }: Props) {
                 >
                   {STATUS_LABELS[event.status]}
                 </Text>
+                {planned && (
+                  <View style={[styles.planned, { borderColor: colors.fg }]}>
+                    <Text style={[styles.plannedText, { color: colors.fg }]}>geplant</Text>
+                  </View>
+                )}
                 <Text style={[styles.date, { color: theme.muted }]}>{formatDate(event.date)}</Text>
                 {removable && (
                   <Pressable
@@ -74,6 +90,9 @@ export function StatusTimeline({ events, firstEventId, onDelete }: Props) {
                   </Pressable>
                 )}
               </View>
+              {details.length > 0 && (
+                <Text style={[styles.note, { color: theme.ink }]}>{details.join(', ')}</Text>
+              )}
               {event.note && (
                 <Text style={[styles.note, { color: theme.muted }]}>{event.note}</Text>
               )}
@@ -98,5 +117,12 @@ const styles = StyleSheet.create({
   status: type.body,
   date: { ...type.small, flex: 1 },
   remove: { padding: 2 },
+  planned: {
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  plannedText: { ...type.label, fontSize: 11 },
   note: { ...type.small, lineHeight: 19 },
 });

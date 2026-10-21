@@ -3,7 +3,9 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type {
   Application,
   Channel,
+  InterviewMode,
   NewApplication,
+  NewStatusEvent,
   Source,
   Status,
   StatusEvent,
@@ -25,6 +27,9 @@ type ApplicationRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** Nur in der Liste: nächstes Gespräch ab heute */
+  next_interview_date?: string | null;
+  next_interview_time?: string | null;
 };
 
 function toApplication(row: ApplicationRow): Application {
@@ -43,12 +48,17 @@ function toApplication(row: ApplicationRow): Application {
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    nextInterview: row.next_interview_date
+      ? { date: row.next_interview_date, time: row.next_interview_time ?? null }
+      : null,
   };
 }
 
 export type ApplicationFilter = {
   search?: string;
   status?: Status | null;
+  /** ISO-Datum von heute; wenn gesetzt, wird das nächste Gespräch mitgeladen. */
+  today?: string;
 };
 
 /** Alle Bewerbungen, neueste zuerst, optional gefiltert. */
@@ -58,24 +68,40 @@ export async function listApplications(
 ): Promise<Application[]> {
   const where: string[] = [];
   const params: string[] = [];
+  const selectParams: string[] = [];
 
   const search = filter.search?.trim();
   if (search) {
-    where.push('(company LIKE ? OR position LIKE ? OR location LIKE ?)');
+    where.push('(a.company LIKE ? OR a.position LIKE ? OR a.location LIKE ?)');
     const like = `%${search}%`;
     params.push(like, like, like);
   }
   if (filter.status) {
-    where.push('status = ?');
+    where.push('a.status = ?');
     params.push(filter.status);
   }
 
+  // Das nächste geplante Gespräch je Bewerbung, aber nur solange sie offen ist.
+  let nextInterview = '';
+  if (filter.today) {
+    nextInterview = `,
+      (SELECT e.date FROM status_events e
+        WHERE e.application_id = a.id AND e.status = 'interview' AND e.date >= ?
+          AND a.status NOT IN ('offer', 'rejected')
+        ORDER BY e.date, e.time LIMIT 1) AS next_interview_date,
+      (SELECT e.time FROM status_events e
+        WHERE e.application_id = a.id AND e.status = 'interview' AND e.date >= ?
+          AND a.status NOT IN ('offer', 'rejected')
+        ORDER BY e.date, e.time LIMIT 1) AS next_interview_time`;
+    selectParams.push(filter.today, filter.today);
+  }
+
   const sql = `
-    SELECT * FROM applications
+    SELECT a.*${nextInterview} FROM applications a
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-    ORDER BY applied_at DESC, id DESC
+    ORDER BY a.applied_at DESC, a.id DESC
   `;
-  const rows = await db.getAllAsync<ApplicationRow>(sql, params);
+  const rows = await db.getAllAsync<ApplicationRow>(sql, [...selectParams, ...params]);
   return rows.map(toApplication);
 }
 
@@ -167,9 +193,14 @@ export async function updateApplication(
   });
 }
 
-/** Löscht die Bewerbung samt Verlauf (ON DELETE CASCADE). */
-export async function deleteApplication(db: SQLiteDatabase, id: number): Promise<void> {
+/**
+ * Löscht die Bewerbung samt Verlauf (ON DELETE CASCADE).
+ * Gibt die Ids der Erinnerungen zurück, die jetzt abgesagt werden müssen.
+ */
+export async function deleteApplication(db: SQLiteDatabase, id: number): Promise<string[]> {
+  const reminders = await reminderIdsWhere(db, 'application_id = ?', id);
   await db.runAsync('DELETE FROM applications WHERE id = ?', id);
+  return reminders;
 }
 
 // ── Statusverlauf ──────────────────────────────────────────────────
@@ -180,7 +211,46 @@ type StatusEventRow = {
   status: string;
   date: string;
   note: string | null;
+  time: string | null;
+  mode: string | null;
+  reminder_ids: string | null;
 };
+
+function parseIds(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const parsed: unknown = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function toStatusEvent(r: StatusEventRow): StatusEvent {
+  return {
+    id: r.id,
+    applicationId: r.application_id,
+    status: r.status as Status,
+    date: r.date,
+    note: r.note,
+    time: r.time,
+    mode: r.mode as InterviewMode | null,
+    reminderIds: parseIds(r.reminder_ids),
+  };
+}
+
+/** Alle Erinnerungs-Ids der Einträge, auf die `where` zutrifft. */
+async function reminderIdsWhere(
+  db: SQLiteDatabase,
+  where: string,
+  ...params: (string | number)[]
+): Promise<string[]> {
+  const rows = await db.getAllAsync<{ reminder_ids: string | null }>(
+    `SELECT reminder_ids FROM status_events WHERE ${where}`,
+    params,
+  );
+  return rows.flatMap((r) => parseIds(r.reminder_ids));
+}
 
 /** Verlauf einer Bewerbung, neuester Eintrag zuerst. */
 export async function listStatusEvents(
@@ -192,13 +262,7 @@ export async function listStatusEvents(
      ORDER BY date DESC, id DESC`,
     applicationId,
   );
-  return rows.map((r) => ({
-    id: r.id,
-    applicationId: r.application_id,
-    status: r.status as Status,
-    date: r.date,
-    note: r.note,
-  }));
+  return rows.map(toStatusEvent);
 }
 
 /**
@@ -219,21 +283,63 @@ async function syncCurrentStatus(db: SQLiteDatabase, applicationId: number): Pro
   );
 }
 
+export type AddStatusResult = {
+  eventId: number;
+  /** Erinnerungen entfernter Termine, die abgesagt werden müssen */
+  cancelledReminderIds: string[];
+};
+
+/**
+ * Schreibt einen neuen Eintrag in den Verlauf.
+ *
+ * Mit `dropLaterInterviews` werden geplante Gespräche nach diesem Datum
+ * entfernt, z. B. wenn vor dem Termin eine Absage kommt. Sonst bliebe der
+ * Termin der jüngste Eintrag, und die Absage würde nie zum aktuellen Status.
+ */
 export async function addStatusEvent(
   db: SQLiteDatabase,
   applicationId: number,
-  event: { status: Status; date: string; note: string | null },
-): Promise<void> {
+  event: NewStatusEvent,
+  options: { dropLaterInterviews?: boolean } = {},
+): Promise<AddStatusResult> {
+  let eventId = 0;
+  let cancelledReminderIds: string[] = [];
+  const isInterview = event.status === 'interview';
+
   await db.withTransactionAsync(async () => {
-    await db.runAsync(
-      'INSERT INTO status_events (application_id, status, date, note) VALUES (?, ?, ?, ?)',
+    if (options.dropLaterInterviews) {
+      const where = `application_id = ? AND status = 'interview' AND date > ?`;
+      cancelledReminderIds = await reminderIdsWhere(db, where, applicationId, event.date);
+      await db.runAsync(`DELETE FROM status_events WHERE ${where}`, applicationId, event.date);
+    }
+    const result = await db.runAsync(
+      `INSERT INTO status_events (application_id, status, date, note, time, mode)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       applicationId,
       event.status,
       event.date,
       event.note,
+      isInterview ? (event.time ?? null) : null,
+      isInterview ? (event.mode ?? null) : null,
     );
+    eventId = result.lastInsertRowId;
     await syncCurrentStatus(db, applicationId);
   });
+
+  return { eventId, cancelledReminderIds };
+}
+
+/** Merkt sich, welche Erinnerungen zu einem Termin geplant wurden. */
+export async function setReminderIds(
+  db: SQLiteDatabase,
+  eventId: number,
+  ids: string[],
+): Promise<void> {
+  await db.runAsync(
+    'UPDATE status_events SET reminder_ids = ? WHERE id = ?',
+    ids.length ? JSON.stringify(ids) : null,
+    eventId,
+  );
 }
 
 /**
@@ -244,7 +350,8 @@ export async function deleteStatusEvent(
   db: SQLiteDatabase,
   applicationId: number,
   eventId: number,
-): Promise<void> {
+): Promise<string[]> {
+  const reminders = await reminderIdsWhere(db, 'id = ? AND application_id = ?', eventId, applicationId);
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `DELETE FROM status_events
@@ -256,6 +363,7 @@ export async function deleteStatusEvent(
     );
     await syncCurrentStatus(db, applicationId);
   });
+  return reminders;
 }
 
 /**
@@ -300,6 +408,34 @@ export async function getApplicationDatesInMonth(
     prefix,
   );
   return rows.map((r) => r.applied_at);
+}
+
+export type UpcomingInterview = {
+  applicationId: number;
+  company: string;
+  position: string;
+  event: StatusEvent;
+};
+
+/** Geplante Gespräche ab heute bei offenen Bewerbungen, nächstes zuerst. */
+export async function listUpcomingInterviews(
+  db: SQLiteDatabase,
+  today: string,
+): Promise<UpcomingInterview[]> {
+  const rows = await db.getAllAsync<StatusEventRow & { company: string; position: string }>(
+    `SELECT e.*, a.company, a.position
+     FROM status_events e JOIN applications a ON a.id = e.application_id
+     WHERE e.status = 'interview' AND e.date >= ?
+       AND a.status NOT IN ('offer', 'rejected')
+     ORDER BY e.date, e.time, e.id`,
+    today,
+  );
+  return rows.map((r) => ({
+    applicationId: r.application_id,
+    company: r.company,
+    position: r.position,
+    event: toStatusEvent(r),
+  }));
 }
 
 export async function countApplications(db: SQLiteDatabase): Promise<number> {

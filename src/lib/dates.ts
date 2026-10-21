@@ -35,6 +35,27 @@ export function formatMonthKey(key: string): string {
   return `${MONTHS[Number(m) - 1]} ${y}`;
 }
 
+const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** "2026-11-05" → "Do, 05.11." */
+export function formatWeekdayDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const weekday = WEEKDAYS[new Date(y, m - 1, d).getDay()];
+  return `${weekday}, ${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.`;
+}
+
+/** "2026-11-05" + "10:00" → lokales Date-Objekt; ohne Uhrzeit 00:00 */
+export function toLocalDateTime(iso: string, time: string | null): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  const [h, min] = (time ?? '00:00').split(':').map(Number);
+  return new Date(y, m - 1, d, h, min);
+}
+
+/** Date → "HH:MM" */
+export function toTimeString(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 /** Monatsname zur Monatsnummer 1–12. */
 export function monthName(month: number): string {
   return MONTHS[month - 1];

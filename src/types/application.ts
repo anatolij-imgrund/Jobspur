@@ -30,12 +30,23 @@ export type Application = {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Nächstes Gespräch ab heute, falls eins geplant ist (nur beim Lesen der Liste). */
+  nextInterview?: { date: string; time: string | null } | null;
 };
 
 export type NewApplication = Omit<
   Application,
-  'id' | 'status' | 'createdAt' | 'updatedAt'
+  'id' | 'status' | 'createdAt' | 'updatedAt' | 'nextInterview'
 > & { status?: Status };
+
+export const INTERVIEW_MODES = ['onsite', 'video', 'phone'] as const;
+export type InterviewMode = (typeof INTERVIEW_MODES)[number];
+
+export const INTERVIEW_MODE_LABELS: Record<InterviewMode, string> = {
+  onsite: 'Vor Ort',
+  video: 'Video',
+  phone: 'Telefon',
+};
 
 export type StatusEvent = {
   id: number;
@@ -44,6 +55,20 @@ export type StatusEvent = {
   /** ISO-Datum */
   date: string;
   note: string | null;
+  /** Uhrzeit "HH:MM", nur bei Gesprächen */
+  time: string | null;
+  /** Art des Gesprächs, nur bei Gesprächen */
+  mode: InterviewMode | null;
+  /** Ids der geplanten Erinnerungen auf dem Handy */
+  reminderIds: string[];
+};
+
+export type NewStatusEvent = {
+  status: Status;
+  date: string;
+  note: string | null;
+  time?: string | null;
+  mode?: InterviewMode | null;
 };
 
 export const STATUS_LABELS: Record<Status, string> = {
@@ -86,7 +111,8 @@ export function isFinal(status: Status): boolean {
 export const NEXT_STATUSES: Record<Status, readonly Status[]> = {
   applied: ['confirmed', 'interview', 'offer', 'rejected', 'no_response'],
   confirmed: ['interview', 'offer', 'rejected', 'no_response'],
-  interview: ['offer', 'rejected', 'no_response'],
+  // Nach dem Gespräch kann ein zweites folgen.
+  interview: ['interview', 'offer', 'rejected', 'no_response'],
   no_response: ['confirmed', 'interview', 'offer', 'rejected'],
   offer: [],
   rejected: [],

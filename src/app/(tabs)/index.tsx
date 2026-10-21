@@ -11,9 +11,12 @@ import {
   countApplications,
   getApplicationDatesInMonth,
   listApplications,
+  listUpcomingInterviews,
+  type UpcomingInterview,
 } from '@/db/applications';
+import { UpcomingInterviews } from '@/features/overview/UpcomingInterviews';
 import { insertSampleData } from '@/db/seed';
-import { formatMonthKey, monthKey } from '@/lib/dates';
+import { formatMonthKey, monthKey, toIsoDate } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
 import type { Application, Status } from '@/types/application';
 
@@ -41,6 +44,7 @@ export default function OverviewScreen() {
   const [items, setItems] = useState<Application[]>([]);
   const [total, setTotal] = useState(0);
   const [monthDates, setMonthDates] = useState<string[]>([]);
+  const [upcoming, setUpcoming] = useState<UpcomingInterview[]>([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<Status | null>(null);
 
@@ -50,14 +54,17 @@ export default function OverviewScreen() {
   const today = now.getDate();
 
   const load = useCallback(async () => {
-    const [list, count, dates] = await Promise.all([
-      listApplications(db, { search, status }),
+    const today = toIsoDate(new Date());
+    const [list, count, dates, interviews] = await Promise.all([
+      listApplications(db, { search, status, today }),
       countApplications(db),
       getApplicationDatesInMonth(db, year, month),
+      listUpcomingInterviews(db, today),
     ]);
     setItems(list);
     setTotal(count);
     setMonthDates(dates);
+    setUpcoming(interviews);
   }, [db, search, status, year, month]);
 
   // Lädt beim Öffnen des Tabs, nach Rückkehr von anderen Seiten
@@ -97,6 +104,7 @@ export default function OverviewScreen() {
         )}
         ListHeaderComponent={
           <>
+            {upcoming.length > 0 && <UpcomingInterviews items={upcoming} />}
             <MonthStrip year={year} month={month} today={today} dates={monthDates} />
             {total > 0 && (
               <FilterBar

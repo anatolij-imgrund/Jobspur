@@ -12,15 +12,22 @@ import {
   getApplication,
   getFirstStatusEventId,
   listStatusEvents,
+  setReminderIds,
 } from '@/db/applications';
 import { type Fact, FactList, toHref } from '@/features/application-detail/FactList';
 import { StatusChanger } from '@/features/application-detail/StatusChanger';
 import { StatusTimeline } from '@/features/application-detail/StatusTimeline';
-import { daysSince, formatDate, formatDaysAgo } from '@/lib/dates';
+import {
+  cancelReminders,
+  ensureNotificationPermission,
+  scheduleInterviewReminders,
+} from '@/features/reminders/reminders';
+import { daysSince, formatDate, formatDaysAgo, formatWeekdayDate, toIsoDate } from '@/lib/dates';
 import { space, type, useTheme } from '@/theme';
 import {
   type Application,
   CHANNEL_LABELS,
+  INTERVIEW_MODE_LABELS,
   isFinal,
   SOURCE_LABELS,
   type StatusEvent,
@@ -84,6 +91,26 @@ export default function BewerbungDetailScreen() {
   // Nur „Beworben“ heißt wirklich: noch gar keine Rückmeldung.
   const waiting = app.status === 'applied';
 
+  const today = toIsoDate(new Date());
+  // Einträge sind neueste zuerst sortiert.
+  const floorDate = events.find((e) => e.date <= today)?.date ?? app.appliedAt;
+  const upcomingInterview = isFinal(app.status)
+    ? null
+    : (events.filter((e) => e.status === 'interview' && e.date >= today).at(-1) ?? null);
+
+  const statusLine = (() => {
+    if (upcomingInterview) {
+      const parts = [
+        formatWeekdayDate(upcomingInterview.date),
+        upcomingInterview.time && `${upcomingInterview.time} Uhr`,
+        upcomingInterview.mode && INTERVIEW_MODE_LABELS[upcomingInterview.mode],
+      ].filter(Boolean);
+      return `am ${parts.join(', ')}`;
+    }
+    if (waiting && days >= 14) return `seit ${days} Tagen ohne Antwort`;
+    return `${isFinal(app.status) ? 'am' : 'seit'} ${formatDate(lastEvent.date)}`;
+  })();
+
   const facts: Fact[] = [
     { label: 'Beworben am', value: `${formatDate(app.appliedAt)}, ${formatDaysAgo(days)}` },
     { label: 'Weg', value: CHANNEL_LABELS[app.channel] },
@@ -106,7 +133,8 @@ export default function BewerbungDetailScreen() {
           text: 'Löschen',
           style: 'destructive',
           onPress: async () => {
-            await deleteApplication(db, id);
+            const reminders = await deleteApplication(db, id);
+            await cancelReminders(reminders);
             router.back();
           },
         },
@@ -146,10 +174,14 @@ export default function BewerbungDetailScreen() {
           </Text>
           <View style={styles.statusRow}>
             <StatusBadge status={app.status} />
-            <Text style={[styles.statusSince, { color: theme.muted }]}>
-              {waiting && days >= 14
-                ? `seit ${days} Tagen ohne Antwort`
-                : `${isFinal(app.status) ? 'am' : 'seit'} ${formatDate(lastEvent.date)}`}
+            <Text
+              style={[
+                styles.statusSince,
+                { color: upcomingInterview ? theme.status.interview.fg : theme.muted },
+                upcomingInterview && { fontWeight: '600' },
+              ]}
+            >
+              {statusLine}
             </Text>
           </View>
         </View>
@@ -171,9 +203,33 @@ export default function BewerbungDetailScreen() {
           </Text>
           <StatusChanger
             current={app.status}
-            currentSince={lastEvent.date}
-            onSave={async (event) => {
-              await addStatusEvent(db, id, event);
+            floorDate={floorDate}
+            upcomingInterview={upcomingInterview}
+            onSave={async (event, options) => {
+              const { eventId, cancelledReminderIds } = await addStatusEvent(db, id, event, {
+                dropLaterInterviews: options.dropLaterInterviews,
+              });
+              await cancelReminders(cancelledReminderIds);
+
+              if (options.remind) {
+                const allowed = await ensureNotificationPermission();
+                if (allowed) {
+                  const ids = await scheduleInterviewReminders({
+                    applicationId: id,
+                    company: app.company,
+                    position: app.position,
+                    date: event.date,
+                    time: event.time ?? null,
+                    mode: event.mode ?? null,
+                  });
+                  await setReminderIds(db, eventId, ids);
+                } else {
+                  Alert.alert(
+                    'Erinnerungen sind ausgeschaltet',
+                    'Der Termin ist gespeichert. Damit die App erinnern kann, erlaube Benachrichtigungen in den Android-Einstellungen unter Apps.',
+                  );
+                }
+              }
               await load();
             }}
           />
@@ -185,7 +241,8 @@ export default function BewerbungDetailScreen() {
             events={events}
             firstEventId={firstEventId}
             onDelete={async (event) => {
-              await deleteStatusEvent(db, id, event.id);
+              const reminders = await deleteStatusEvent(db, id, event.id);
+              await cancelReminders(reminders);
               await load();
             }}
           />

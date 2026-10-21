@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { formatDate } from '@/lib/dates';
+import { formatDate, formatWeekdayDate } from '@/lib/dates';
 import { space, type, useTheme } from '@/theme';
 import { CHANNEL_LABELS, type Application } from '@/types/application';
 
@@ -50,7 +50,14 @@ export function ApplicationRow({ application }: Props) {
             {meta}
           </Text>
         </View>
-        <StatusBadge status={application.status} />
+        <StatusBadge
+          status={application.status}
+          label={
+            application.nextInterview
+              ? `Gespräch ${formatWeekdayDate(application.nextInterview.date)}`
+              : undefined
+          }
+        />
       </View>
     </Pressable>
   );

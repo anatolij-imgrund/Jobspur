@@ -3,10 +3,14 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
+// Setzt beim Import, wie Erinnerungen bei offener App angezeigt werden.
+import '@/features/reminders/reminders';
+import { useReminderTaps } from '@/features/reminders/useReminderTaps';
 import { useTheme } from '@/theme';
 
 export default function RootLayout() {
   const theme = useTheme();
+  useReminderTaps();
 
   return (
     <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrateDbIfNeeded}>

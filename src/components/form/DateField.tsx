@@ -10,8 +10,13 @@ type Props = {
   value: string;
   onChange: (iso: string) => void;
   invalid?: boolean;
-  /** Frühestes wählbares Datum (ISO); spätestes ist immer heute. */
+  /** Frühestes wählbares Datum (ISO). */
   minimumDate?: string;
+  /**
+   * `past` (Standard): bis heute, Schnellwahl „Heute“ und „Gestern“.
+   * `future`: auch künftige Tage, Schnellwahl „Heute“ und „Morgen“ (für Termine).
+   */
+  direction?: 'past' | 'future';
   accessibilityLabel?: string;
 };
 
@@ -21,33 +26,41 @@ function parseIso(iso: string): Date {
   return new Date(y, m - 1, d, 12);
 }
 
+/** ISO-Datum für heute + `offset` Tage */
+function dayFromToday(offset: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return toIsoDate(d);
+}
+
 function relativeLabel(iso: string): string | null {
-  const today = new Date();
-  if (iso === toIsoDate(today)) return 'heute';
-  today.setDate(today.getDate() - 1);
-  if (iso === toIsoDate(today)) return 'gestern';
+  if (iso === dayFromToday(0)) return 'heute';
+  if (iso === dayFromToday(-1)) return 'gestern';
+  if (iso === dayFromToday(1)) return 'morgen';
   return null;
 }
 
-/** Datumsfeld mit Schnellwahl „Heute“ und „Gestern“ und Kalender. */
+/** Datumsfeld mit zwei Schnellwahl-Knöpfen und Kalender. */
 export function DateField({
   value,
   onChange,
   invalid,
   minimumDate,
+  direction = 'past',
   accessibilityLabel = 'Datum',
 }: Props) {
   const theme = useTheme();
   const [iosOpen, setIosOpen] = useState(false);
   const relative = relativeLabel(value);
   const minDate = minimumDate ? parseIso(minimumDate) : undefined;
+  const maxDate = direction === 'past' ? new Date() : undefined;
 
   const openPicker = () => {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
         value: parseIso(value),
         mode: 'date',
-        maximumDate: new Date(),
+        maximumDate: maxDate,
         minimumDate: minDate,
         firstDayOfWeek: 1,
         onValueChange: (_event, date) => onChange(toIsoDate(date)),
@@ -57,10 +70,8 @@ export function DateField({
     }
   };
 
-  const shortcut = (label: string, daysBack: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - daysBack);
-    const iso = toIsoDate(d);
+  const shortcut = (label: string, offset: number) => {
+    const iso = dayFromToday(offset);
     const selected = iso === value;
     // ISO-Daten lassen sich als Text vergleichen.
     const disabled = minimumDate !== undefined && iso < minimumDate;
@@ -104,7 +115,7 @@ export function DateField({
           {relative && <Text style={[styles.relative, { color: theme.muted }]}>{relative}</Text>}
         </Pressable>
         {shortcut('Heute', 0)}
-        {shortcut('Gestern', 1)}
+        {direction === 'past' ? shortcut('Gestern', -1) : shortcut('Morgen', 1)}
       </View>
 
       {Platform.OS === 'ios' && iosOpen && (
@@ -112,7 +123,7 @@ export function DateField({
           value={parseIso(value)}
           mode="date"
           display="inline"
-          maximumDate={new Date()}
+          maximumDate={maxDate}
           minimumDate={minDate}
           accentColor={theme.accent}
           onValueChange={(_event, date) => onChange(toIsoDate(date))}

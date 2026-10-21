@@ -35,13 +35,17 @@ function shortDate(iso: string): string {
   return `${d}.${m}.`;
 }
 
+/** Ein Eintrag, z. B. „Gespräch 12.10.“ oder „Gespräch 05.11. (geplant)“ */
+function eventText(e: StatusEvent, createdAt: string): string {
+  const planned = e.status === 'interview' && e.date > createdAt;
+  return `${escapeHtml(STATUS_LABELS[e.status])} ${shortDate(e.date)}${planned ? ' (geplant)' : ''}`;
+}
+
 /** Alle Rückmeldungen nach „Beworben“, z. B. „Gespräch 12.10., Absage 20.10.“ */
-function responseText(events: StatusEvent[]): string {
+function responseText(events: StatusEvent[], createdAt: string): string {
   const replies = events.filter((e) => e.status !== 'applied');
   if (replies.length === 0) return '<span class="muted">noch offen</span>';
-  return replies
-    .map((e) => `${escapeHtml(STATUS_LABELS[e.status])} ${shortDate(e.date)}`)
-    .join('<br>');
+  return replies.map((e) => eventText(e, createdAt)).join('<br>');
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -182,7 +186,7 @@ export function renderReport({ data, profile, recipient, createdAt }: Options): 
         <td>${company}</td>
         <td>${escapeHtml(a.position)}</td>
         <td>${channel}</td>
-        <td>${responseText(events)}</td>
+        <td>${responseText(events, createdAt)}</td>
       </tr>`;
     })
     .join('');
@@ -221,7 +225,7 @@ export function renderReport({ data, profile, recipient, createdAt }: Options): 
                 <td class="date">${formatDate(event.date)}</td>
                 <td><strong>${escapeHtml(a.company)}</strong>${a.location ? `<br>${escapeHtml(a.location)}` : ''}</td>
                 <td>${escapeHtml(a.position)}</td>
-                <td>${escapeHtml(STATUS_LABELS[event.status])}</td>
+                <td>${eventText(event, createdAt)}</td>
                 <td class="date">${formatDate(a.appliedAt)}</td>
               </tr>`,
             )

@@ -1,58 +1,136 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
+import { ChoiceGroup } from '@/components/form/ChoiceGroup';
 import { DateField } from '@/components/form/DateField';
 import { Field } from '@/components/form/Field';
 import { TextField } from '@/components/form/TextField';
-import { formatDate, toIsoDate } from '@/lib/dates';
+import { TimeField } from '@/components/form/TimeField';
+import { formatDate, formatWeekdayDate, toIsoDate, toLocalDateTime } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
-import { NEXT_STATUSES, STATUS_LABELS, type Status } from '@/types/application';
+import {
+  INTERVIEW_MODE_LABELS,
+  INTERVIEW_MODES,
+  type InterviewMode,
+  NEXT_STATUSES,
+  type NewStatusEvent,
+  STATUS_LABELS,
+  type Status,
+  type StatusEvent,
+} from '@/types/application';
+
+export type SaveStatusOptions = {
+  /** Geplante Gespräche nach dem neuen Datum entfernen */
+  dropLaterInterviews: boolean;
+  /** Erinnerungen für ein künftiges Gespräch planen */
+  remind: boolean;
+};
 
 type Props = {
   current: Status;
-  /** Datum des aktuellen Status: Ein neuer kann nicht davor liegen. */
-  currentSince: string;
-  onSave: (event: { status: Status; date: string; note: string | null }) => Promise<void>;
+  /**
+   * Datum des letzten Eintrags, der nicht in der Zukunft liegt.
+   * Ein neuer Eintrag kann nicht davor liegen.
+   */
+  floorDate: string;
+  /** Nächstes geplantes Gespräch, falls vorhanden */
+  upcomingInterview: StatusEvent | null;
+  onSave: (event: NewStatusEvent, options: SaveStatusOptions) => Promise<void>;
 };
 
 const NOTE_PLACEHOLDER: Partial<Record<Status, string>> = {
-  interview: 'z. B. Termin per Video, Gespräch mit Frau Berger',
+  interview: 'z. B. Adresse, Ansprechperson, Link zum Videocall',
   rejected: 'z. B. Absage per E-Mail, Begründung',
   offer: 'z. B. Start zum 1. Dezember',
 };
 
+function confirm(title: string, message: string, ok: string): Promise<boolean> {
+  return new Promise((resolve) =>
+    Alert.alert(title, message, [
+      { text: 'Abbrechen', style: 'cancel', onPress: () => resolve(false) },
+      { text: ok, style: 'destructive', onPress: () => resolve(true) },
+    ], { cancelable: true, onDismiss: () => resolve(false) }),
+  );
+}
+
 /**
- * Status wählen, dann klappt darunter Datum und Notiz auf.
- * Erst „Status speichern“ schreibt den Eintrag in den Verlauf.
+ * Status wählen, dann klappen darunter die passenden Felder auf.
+ * Beim Gespräch zusätzlich Uhrzeit, Art und Erinnerung.
  */
-export function StatusChanger({ current, currentSince, onSave }: Props) {
+export function StatusChanger({ current, floorDate, upcomingInterview, onSave }: Props) {
   const theme = useTheme();
   const [selected, setSelected] = useState<Status | null>(null);
   const [date, setDate] = useState(() => toIsoDate(new Date()));
+  const [time, setTime] = useState<string | null>(null);
+  const [mode, setMode] = useState<InterviewMode>('onsite');
+  const [remind, setRemind] = useState(true);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const options = NEXT_STATUSES[current];
+  const isInterview = selected === 'interview';
+  const inFuture = toLocalDateTime(date, time ?? '23:59').getTime() > Date.now();
 
   const reset = () => {
     setSelected(null);
     setDate(toIsoDate(new Date()));
+    setTime(null);
+    setMode('onsite');
+    setRemind(true);
     setNote('');
     setError(null);
   };
 
+  const select = (status: Status) => {
+    const next = status === selected ? null : status;
+    setSelected(next);
+    setError(null);
+    // Ein Gespräch wird meist für einen der nächsten Tage vereinbart.
+    if (next === 'interview' && date === toIsoDate(new Date()) && !upcomingInterview) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setDate(toIsoDate(tomorrow));
+    }
+    if (next !== 'interview' && date > toIsoDate(new Date())) {
+      setDate(toIsoDate(new Date()));
+    }
+  };
+
   const save = async () => {
     if (!selected) return;
-    if (date < currentSince) {
-      setError(
-        `Das Datum liegt vor „${STATUS_LABELS[current]}“ am ${formatDate(currentSince)}.`,
-      );
+    if (date < floorDate) {
+      setError(`Das Datum liegt vor dem letzten Eintrag am ${formatDate(floorDate)}.`);
       return;
     }
+
+    // Kommt etwas vor einem geplanten Gespräch dazwischen, fällt der Termin weg.
+    let dropLaterInterviews = false;
+    if (upcomingInterview && date < upcomingInterview.date) {
+      const when = formatWeekdayDate(upcomingInterview.date);
+      const ok = await confirm(
+        isInterview ? 'Termin ersetzen?' : 'Geplanten Termin entfernen?',
+        isInterview
+          ? `Das geplante Gespräch am ${when} wird durch den neuen Termin ersetzt.`
+          : `Das geplante Gespräch am ${when} wird samt Erinnerung entfernt.`,
+        isInterview ? 'Ersetzen' : 'Entfernen',
+      );
+      if (!ok) return;
+      dropLaterInterviews = true;
+    }
+
     setSaving(true);
     try {
-      await onSave({ status: selected, date, note: note.trim() || null });
+      await onSave(
+        {
+          status: selected,
+          date,
+          note: note.trim() || null,
+          time: isInterview ? time : null,
+          mode: isInterview ? mode : null,
+        },
+        { dropLaterInterviews, remind: isInterview && inFuture && remind },
+      );
       reset();
     } catch (e) {
       console.error(e);
@@ -74,6 +152,9 @@ export function StatusChanger({ current, currentSince, onSave }: Props) {
     );
   }
 
+  const chipLabel = (status: Status) =>
+    status === 'interview' && current === 'interview' ? 'Weiteres Gespräch' : STATUS_LABELS[status];
+
   return (
     <View style={styles.wrap}>
       <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Neuer Status">
@@ -83,10 +164,7 @@ export function StatusChanger({ current, currentSince, onSave }: Props) {
           return (
             <Pressable
               key={status}
-              onPress={() => {
-                setSelected(active ? null : status);
-                setError(null);
-              }}
+              onPress={() => select(status)}
               accessibilityRole="radio"
               accessibilityState={{ checked: active }}
               style={[
@@ -102,7 +180,7 @@ export function StatusChanger({ current, currentSince, onSave }: Props) {
                   { color: active ? colors.fg : theme.ink, fontWeight: active ? '600' : '400' },
                 ]}
               >
-                {STATUS_LABELS[status]}
+                {chipLabel(status)}
               </Text>
             </Pressable>
           );
@@ -111,18 +189,56 @@ export function StatusChanger({ current, currentSince, onSave }: Props) {
 
       {selected && (
         <View style={[styles.panel, { backgroundColor: theme.surface, borderColor: theme.line }]}>
-          <Field label="Seit wann?" error={error ?? undefined}>
+          <Field label={isInterview ? 'Wann?' : 'Seit wann?'} error={error ?? undefined}>
             <DateField
               value={date}
               onChange={(iso) => {
                 setDate(iso);
                 setError(null);
               }}
-              minimumDate={currentSince}
+              minimumDate={floorDate}
+              direction={isInterview ? 'future' : 'past'}
               invalid={!!error}
               accessibilityLabel={`Datum für ${STATUS_LABELS[selected]}`}
             />
           </Field>
+
+          {isInterview && (
+            <>
+              <Field label="Uhrzeit" optional>
+                <TimeField value={time} onChange={setTime} accessibilityLabel="Uhrzeit des Gesprächs" />
+              </Field>
+              <Field label="Wie?">
+                <ChoiceGroup
+                  options={INTERVIEW_MODES}
+                  labels={INTERVIEW_MODE_LABELS}
+                  value={mode}
+                  onChange={setMode}
+                  accessibilityLabel="Art des Gesprächs"
+                />
+              </Field>
+              {inFuture && (
+                <View style={styles.switchRow}>
+                  <View style={styles.flex}>
+                    <Text style={[styles.switchLabel, { color: theme.ink }]}>Erinnern</Text>
+                    <Text style={[styles.switchHint, { color: theme.muted }]}>
+                      {time
+                        ? 'Am Vorabend um 18 Uhr und eine Stunde vorher'
+                        : 'Am Vorabend um 18 Uhr und morgens um 8 Uhr'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={remind}
+                    onValueChange={setRemind}
+                    trackColor={{ true: theme.accent, false: theme.line }}
+                    thumbColor={theme.surface}
+                    accessibilityLabel="An das Gespräch erinnern"
+                  />
+                </View>
+              )}
+            </>
+          )}
+
           <Field label="Notiz" optional>
             <TextField
               value={note}
@@ -132,6 +248,7 @@ export function StatusChanger({ current, currentSince, onSave }: Props) {
               accessibilityLabel="Notiz zum Status"
             />
           </Field>
+
           <View style={styles.actions}>
             <Pressable onPress={reset} accessibilityRole="button" hitSlop={8} style={styles.cancel}>
               <Text style={[styles.cancelText, { color: theme.muted }]}>Abbrechen</Text>
@@ -149,7 +266,7 @@ export function StatusChanger({ current, currentSince, onSave }: Props) {
                 <ActivityIndicator color={theme.accentInk} />
               ) : (
                 <Text style={[styles.saveText, { color: theme.accentInk }]}>
-                  „{STATUS_LABELS[selected]}“ speichern
+                  {isInterview && inFuture ? 'Termin speichern' : `„${STATUS_LABELS[selected]}“ speichern`}
                 </Text>
               )}
             </Pressable>
@@ -161,6 +278,7 @@ export function StatusChanger({ current, currentSince, onSave }: Props) {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   wrap: { gap: space.md },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   chip: {
@@ -177,6 +295,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  switchLabel: { ...type.body, fontWeight: '600' },
+  switchHint: type.small,
   actions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: space.lg },
   cancel: { paddingVertical: space.sm },
   cancelText: { ...type.body, fontWeight: '500' },
