@@ -12,12 +12,14 @@ import {
   BackupError,
   buildBackup,
   describeBackup,
+  getBackupFolderUri,
   getLastBackupAt,
   parseBackup,
   restoreBackup,
+  setBackupFolderUri,
   setLastBackupAt,
 } from './backup';
-import { pickBackupText, shareBackup } from './backupFile';
+import { folderLabel, pickBackupText, saveBackupToFolder, shareBackup } from './backupFile';
 
 /** Ab so vielen Tagen ohne Sicherung gibt es einen sanften Hinweis. */
 const REMIND_AFTER_DAYS = 30;
@@ -40,23 +42,53 @@ export function BackupSection({ onRestored }: { onRestored: () => void }) {
   const db = useSQLiteContext();
   const theme = useTheme();
   const [lastBackupAt, setLast] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'export' | 'import' | null>(null);
+  const [folderUri, setFolderUri] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'folder' | 'share' | 'import' | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       getLastBackupAt(db).then(setLast);
+      getBackupFolderUri(db).then(setFolderUri);
     }, [db]),
   );
 
-  const exportBackup = async () => {
-    setBusy('export');
+  const markSaved = async () => {
+    const today = toIsoDate(new Date());
+    await setLastBackupAt(db, today);
+    setLast(today);
+  };
+
+  /** Ohne Internet: direkt in einen Ordner auf dem Handy. */
+  const saveToFolder = async (chooseNew = false) => {
+    setBusy('folder');
+    try {
+      const result = await saveBackupToFolder(await buildBackup(db), folderUri, { chooseNew });
+      if (!result) return; // abgebrochen
+      if (result.folderUri !== folderUri) {
+        await setBackupFolderUri(db, result.folderUri);
+        setFolderUri(result.folderUri);
+      }
+      await markSaved();
+      Alert.alert('Gespeichert', `Die Sicherung liegt im Ordner „${folderLabel(result.folderUri)}“.`);
+    } catch (e) {
+      console.error(e);
+      Alert.alert(
+        'Sicherung fehlgeschlagen',
+        'Die Datei konnte nicht in den Ordner geschrieben werden. Wähle über „Ordner ändern“ einen anderen.',
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Über den Teilen-Dialog: Google Drive, E-Mail, Messenger … */
+  const share = async () => {
+    setBusy('share');
     try {
       await shareBackup(await buildBackup(db));
       // Ob im Teilen-Dialog wirklich gespeichert wurde, erfährt die App nicht.
       // Wer den Dialog öffnet, hat aber in aller Regel gesichert.
-      const today = toIsoDate(new Date());
-      await setLastBackupAt(db, today);
-      setLast(today);
+      await markSaved();
     } catch (e) {
       console.error(e);
       Alert.alert('Sicherung fehlgeschlagen', 'Die Datei konnte nicht erstellt werden.');
@@ -112,8 +144,9 @@ export function BackupSection({ onRestored }: { onRestored: () => void }) {
     <View style={styles.section}>
       <Text style={[styles.title, { color: theme.ink }]}>Datensicherung</Text>
       <Text style={[styles.intro, { color: theme.muted }]}>
-        Deine Daten liegen nur auf diesem Handy. Speichere ab und zu eine Sicherung in Google
-        Drive oder schick sie dir per E-Mail, dann sind sie auch bei einem neuen Handy da.
+        Deine Daten liegen nur auf diesem Handy. Speichere ab und zu eine Sicherung, am besten
+        zusätzlich außerhalb des Handys, z. B. in Google Drive. Dann sind deine Daten auch bei
+        einem neuen Handy da.
       </Text>
 
       <Text
@@ -129,18 +162,53 @@ export function BackupSection({ onRestored }: { onRestored: () => void }) {
       </Text>
 
       <Pressable
-        onPress={exportBackup}
+        onPress={() => saveToFolder()}
         disabled={busy !== null}
         accessibilityRole="button"
+        accessibilityHint="Speichert ohne Internet in einen Ordner auf dem Handy"
         style={({ pressed }) => [
           styles.primary,
           { backgroundColor: theme.accent, opacity: pressed || busy ? 0.75 : 1 },
         ]}
       >
-        {busy === 'export' ? (
+        {busy === 'folder' ? (
           <ActivityIndicator color={theme.accentInk} />
         ) : (
-          <Text style={[styles.primaryText, { color: theme.accentInk }]}>Sicherung erstellen</Text>
+          <View style={styles.buttonText}>
+            <Text style={[styles.primaryText, { color: theme.accentInk }]}>Auf dem Handy speichern</Text>
+            <Text style={[styles.primaryHint, { color: theme.accentInk }]}>
+              {folderUri ? `im Ordner „${folderLabel(folderUri)}“` : 'Ordner beim ersten Mal wählen'}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+      {folderUri && (
+        <Pressable
+          onPress={() => saveToFolder(true)}
+          disabled={busy !== null}
+          accessibilityRole="button"
+          hitSlop={8}
+          style={styles.link}
+        >
+          <Text style={[styles.linkText, { color: theme.accent }]}>Ordner ändern</Text>
+        </Pressable>
+      )}
+
+      <Pressable
+        onPress={share}
+        disabled={busy !== null}
+        accessibilityRole="button"
+        style={({ pressed }) => [
+          styles.secondary,
+          { borderColor: theme.line, opacity: pressed || busy ? 0.75 : 1 },
+        ]}
+      >
+        {busy === 'share' ? (
+          <ActivityIndicator color={theme.accent} />
+        ) : (
+          <Text style={[styles.secondaryText, { color: theme.accent }]}>
+            Teilen: Drive, E-Mail …
+          </Text>
         )}
       </Pressable>
 
@@ -171,12 +239,16 @@ const styles = StyleSheet.create({
   intro: { ...type.small, lineHeight: 19, marginTop: -space.xs },
   last: type.small,
   primary: {
-    minHeight: 48,
+    minHeight: 56,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryText: { ...type.body, fontWeight: '600' },
+  primaryHint: { ...type.small, opacity: 0.85 },
+  buttonText: { alignItems: 'center', paddingVertical: space.sm },
+  link: { alignSelf: 'center', marginTop: -space.xs },
+  linkText: { ...type.small, fontWeight: '600' },
   secondary: {
     minHeight: 48,
     borderRadius: radius.md,

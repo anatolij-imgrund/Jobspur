@@ -1,16 +1,68 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 import type { Backup } from './backup';
 import { BackupError, backupFileName, LIMITS } from './backup';
+
+export { folderLabel } from './backup';
+
+function toJson(backup: Backup): string {
+  return JSON.stringify(backup, null, 2);
+}
+
+/** Ordner wählen lassen; null, wenn abgebrochen wurde. */
+async function pickFolder(): Promise<Directory | null> {
+  try {
+    return await Directory.pickDirectoryAsync();
+  } catch {
+    // Abbrechen meldet Android als Fehler.
+    return null;
+  }
+}
+
+function writeInto(folder: Directory, backup: Backup): void {
+  // Gibt es die Datei von heute schon, vergibt Android selbst „(1)“ usw.
+  const file = folder.createFile(backupFileName(), 'application/json');
+  file.write(toJson(backup));
+}
+
+export type FolderSaveResult = { folderUri: string } | null;
+
+/**
+ * Speichert die Sicherung direkt in einen Ordner auf dem Handy, ohne
+ * Internet. Beim ersten Mal wird der Ordner gewählt; Android merkt sich die
+ * Erlaubnis, sodass es danach ohne Nachfrage geht.
+ *
+ * Ist der gemerkte Ordner nicht mehr erreichbar (gelöscht, Erlaubnis
+ * entzogen), wird einmal neu gefragt. Gibt null zurück, wenn abgebrochen
+ * wurde.
+ */
+export async function saveBackupToFolder(
+  backup: Backup,
+  rememberedUri: string | null,
+  { chooseNew = false } = {},
+): Promise<FolderSaveResult> {
+  if (rememberedUri && !chooseNew) {
+    try {
+      writeInto(new Directory(rememberedUri), backup);
+      return { folderUri: rememberedUri };
+    } catch (error) {
+      console.warn('Gemerkter Ordner nicht erreichbar, frage neu:', error);
+    }
+  }
+  const folder = await pickFolder();
+  if (!folder) return null;
+  writeInto(folder, backup);
+  return { folderUri: folder.uri };
+}
 
 /** Schreibt die Sicherung als Datei und öffnet den Teilen-Dialog. */
 export async function shareBackup(backup: Backup): Promise<void> {
   const file = new File(Paths.cache, backupFileName());
   if (file.exists) file.delete();
   file.create();
-  file.write(JSON.stringify(backup, null, 2));
+  file.write(toJson(backup));
 
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error('Teilen ist auf diesem Gerät nicht verfügbar.');

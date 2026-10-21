@@ -155,6 +155,13 @@ export type Backup = z.infer<typeof backupSchema>;
 
 export class BackupError extends Error {}
 
+/**
+ * Einstellungen, die nur zu diesem Handy gehören. Sie kommen nicht in die
+ * Sicherung und bleiben beim Wiederherstellen stehen.
+ */
+const DEVICE_SETTINGS = ['lastBackupAt', 'backupFolderUri'] as const;
+const DEVICE_SETTINGS_SQL = DEVICE_SETTINGS.map((k) => `'${k}'`).join(', ');
+
 // ── Erstellen ───────────────────────────────────────────────────────
 
 /** Liest alles aus der Datenbank, was in die Sicherung gehört. */
@@ -167,8 +174,7 @@ export async function buildBackup(db: SQLiteDatabase, now = new Date()): Promise
     ),
     db.getAllAsync<Backup['recipients'][number]>('SELECT * FROM recipients ORDER BY id'),
     db.getAllAsync<Backup['settings'][number]>(
-      // Der Zeitpunkt der letzten Sicherung gehört zum Gerät, nicht zu den Daten.
-      "SELECT key, value FROM settings WHERE key <> 'lastBackupAt' ORDER BY key",
+      `SELECT key, value FROM settings WHERE key NOT IN (${DEVICE_SETTINGS_SQL}) ORDER BY key`,
     ),
   ]);
   return {
@@ -261,7 +267,7 @@ export async function restoreBackup(db: SQLiteDatabase, b: Backup): Promise<stri
       DELETE FROM status_events;
       DELETE FROM applications;
       DELETE FROM recipients;
-      DELETE FROM settings WHERE key <> 'lastBackupAt';
+      DELETE FROM settings WHERE key NOT IN (${DEVICE_SETTINGS_SQL});
     `);
 
     for (const a of b.applications) {
@@ -324,6 +330,33 @@ export async function setLastBackupAt(db: SQLiteDatabase, iso: string): Promise<
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     iso,
   );
+}
+
+export async function getBackupFolderUri(db: SQLiteDatabase): Promise<string | null> {
+  const row = await db.getFirstAsync<{ value: string | null }>(
+    "SELECT value FROM settings WHERE key = 'backupFolderUri'",
+  );
+  return row?.value ?? null;
+}
+
+export async function setBackupFolderUri(db: SQLiteDatabase, uri: string | null): Promise<void> {
+  if (uri === null) {
+    await db.runAsync("DELETE FROM settings WHERE key = 'backupFolderUri'");
+    return;
+  }
+  await db.runAsync(
+    `INSERT INTO settings (key, value) VALUES ('backupFolderUri', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    uri,
+  );
+}
+
+/** Lesbarer Ordnername aus einer Android-Ordneradresse, z. B. „Download“. */
+export function folderLabel(uri: string): string {
+  // Adressen sehen etwa so aus: content://…/tree/primary%3ADownload%2FBackups
+  const tree = decodeURIComponent(uri.split('/tree/')[1] ?? uri);
+  const path = tree.includes(':') ? tree.slice(tree.indexOf(':') + 1) : tree;
+  return path || 'Interner Speicher';
 }
 
 /** Dateiname mit Datum, z. B. Bewerbungstracker_Sicherung_2026-10-21.json */
