@@ -23,8 +23,16 @@ export async function getProfile(db: SQLiteDatabase): Promise<Profile> {
   const raw = await getSetting(db, 'profile');
   if (!raw) return { ...EMPTY_PROFILE };
   try {
-    // Fehlende Felder aus älteren Versionen mit Leerwerten auffüllen.
-    return { ...EMPTY_PROFILE, ...(JSON.parse(raw) as Partial<Profile>) };
+    const parsed: unknown = JSON.parse(raw);
+    const source = typeof parsed === 'object' && parsed !== null ? parsed : {};
+    // Nur Texte übernehmen; fehlende oder falsche Felder werden zu Leerwerten.
+    // So kann ein kaputter Eintrag später nichts zum Absturz bringen.
+    const profile = { ...EMPTY_PROFILE };
+    for (const key of Object.keys(EMPTY_PROFILE) as (keyof Profile)[]) {
+      const value = (source as Record<string, unknown>)[key];
+      if (typeof value === 'string') profile[key] = value;
+    }
+    return profile;
   } catch {
     return { ...EMPTY_PROFILE };
   }

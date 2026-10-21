@@ -8,29 +8,44 @@ import { RECIPIENT_KINDS } from '@/types/profile';
 /** Erkennungszeichen, damit nicht jede beliebige JSON-Datei eingelesen wird. */
 const APP_ID = 'bewerbungstracker';
 
+/**
+ * Obergrenzen für alles, was aus einer Datei kommt. Großzügig für echte
+ * Nutzung, aber eng genug, dass eine präparierte Datei die App weder
+ * lahmlegt noch den Speicher sprengt. Die Textlängen entsprechen den
+ * Formularen.
+ */
+export const LIMITS = {
+  fileBytes: 5 * 1024 * 1024,
+  applications: 10_000,
+  statusEvents: 100_000,
+  recipients: 100,
+} as const;
+
 // ── Aufbau der Sicherungsdatei ──────────────────────────────────────
 // Die Zeilen werden so gespeichert, wie sie in der Datenbank liegen
 // (snake_case). Felder, die erst in späteren Versionen dazukamen, sind
 // optional, damit sich auch ältere Sicherungen einlesen lassen.
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const optText = z.string().nullable().optional();
+const text = (max: number) => z.string().min(1).max(max);
+const optText = (max: number) => z.string().max(max).nullable().optional();
+const stamp = z.string().max(40);
 
 const applicationRow = z.object({
   id: z.number().int().positive(),
-  company: z.string().min(1),
-  position: z.string().min(1),
+  company: text(120),
+  position: text(160),
   applied_at: isoDate,
   channel: z.enum(CHANNELS),
   source: z.enum(SOURCES),
   status: z.enum(STATUSES),
-  location: optText,
-  contact_name: optText,
-  contact_email: optText,
-  job_url: optText,
-  notes: optText,
-  created_at: z.string(),
-  updated_at: z.string(),
+  location: optText(120),
+  contact_name: optText(120),
+  contact_email: z.email().max(200).nullable().optional(),
+  job_url: optText(500),
+  notes: optText(2000),
+  created_at: stamp,
+  updated_at: stamp,
 });
 
 const statusEventRow = z.object({
@@ -38,7 +53,7 @@ const statusEventRow = z.object({
   application_id: z.number().int().positive(),
   status: z.enum(STATUSES),
   date: isoDate,
-  note: optText,
+  note: optText(2000),
   time: z
     .string()
     .regex(/^\d{2}:\d{2}$/)
@@ -50,37 +65,89 @@ const statusEventRow = z.object({
 const recipientRow = z.object({
   id: z.number().int().positive(),
   kind: z.enum(RECIPIENT_KINDS),
-  name: z.string().min(1),
-  customer_number: optText,
-  bg_number: optText,
-  contact_person: optText,
-  street: optText,
-  zip: optText,
-  city: optText,
-  created_at: z.string().optional(),
+  name: text(120),
+  customer_number: optText(40),
+  bg_number: optText(40),
+  contact_person: optText(120),
+  street: optText(120),
+  zip: optText(5),
+  city: optText(80),
+  created_at: stamp.optional(),
 });
 
-const settingRow = z.object({ key: z.string().min(1), value: z.string().nullable() });
+/**
+ * Nur bekannte Einstellungen werden übernommen. Das Profil liegt als JSON
+ * im Feld `value`; auch dessen Inhalt wird geprüft, denn ein Objekt statt
+ * eines Textes würde später z. B. das PDF abstürzen lassen.
+ */
+const profileValue = z.object({
+  name: z.string().max(120),
+  street: z.string().max(120),
+  zip: z.string().max(5),
+  city: z.string().max(80),
+  email: z.string().max(200),
+  phone: z.string().max(40),
+});
+const settingRow = z.discriminatedUnion('key', [
+  z.object({
+    key: z.literal('profile'),
+    value: z.string().max(5000).refine((v) => {
+      try {
+        return profileValue.partial().safeParse(JSON.parse(v)).success;
+      } catch {
+        return false;
+      }
+    }, 'Profil ungültig'),
+  }),
+]);
+
+/** Unbekannte Einstellungen (z. B. aus späteren Versionen) still auslassen. */
+const settingsList = z
+  .array(z.unknown())
+  .max(50)
+  .transform((rows) => rows.filter((r) => settingRow.safeParse(r).success))
+  .pipe(z.array(settingRow));
 
 const backupSchema = z
   .object({
     app: z.literal(APP_ID),
     schemaVersion: z.number().int().positive(),
     exportedAt: z.string(),
-    applications: z.array(applicationRow),
-    statusEvents: z.array(statusEventRow),
-    recipients: z.array(recipientRow).default([]),
-    settings: z.array(settingRow).default([]),
+    applications: z.array(applicationRow).max(LIMITS.applications),
+    statusEvents: z.array(statusEventRow).max(LIMITS.statusEvents),
+    recipients: z.array(recipientRow).max(LIMITS.recipients).default([]),
+    settings: settingsList.default([]),
   })
   .superRefine((b, ctx) => {
-    // Jeder Verlaufseintrag muss zu einer Bewerbung in der Datei gehören.
-    const ids = new Set(b.applications.map((a) => a.id));
-    const orphan = b.statusEvents.find((e) => !ids.has(e.application_id));
-    if (orphan) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `Verlaufseintrag ${orphan.id} gehört zu keiner Bewerbung`,
-      });
+    const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
+
+    // Ids müssen eindeutig sein, sonst bricht das Einfügen ab.
+    for (const [name, rows] of [
+      ['Bewerbung', b.applications],
+      ['Verlaufseintrag', b.statusEvents],
+      ['Stelle', b.recipients],
+    ] as const) {
+      const seen = new Set<number>();
+      for (const row of rows) {
+        if (seen.has(row.id)) return issue(`${name} ${row.id} kommt doppelt vor`);
+        seen.add(row.id);
+      }
+    }
+
+    // Der Verlauf muss zur Bewerbung passen: gleiche Regeln wie in der App.
+    const apps = new Map(b.applications.map((a) => [a.id, a]));
+    const firstEvent = new Map<number, (typeof b.statusEvents)[number]>();
+    for (const e of b.statusEvents) {
+      const a = apps.get(e.application_id);
+      if (!a) return issue(`Verlaufseintrag ${e.id} gehört zu keiner Bewerbung`);
+      if (e.date < a.applied_at) return issue(`Verlaufseintrag ${e.id} liegt vor der Bewerbung`);
+      const first = firstEvent.get(a.id);
+      if (!first || e.id < first.id) firstEvent.set(a.id, e);
+    }
+    for (const a of b.applications) {
+      const first = firstEvent.get(a.id);
+      if (!first) return issue(`Bewerbung ${a.id} hat keinen Verlauf`);
+      if (first.status !== 'applied') return issue(`Verlauf von Bewerbung ${a.id} beginnt nicht mit „Beworben“`);
     }
   });
 
@@ -142,8 +209,14 @@ export function parseBackup(text: string): Backup {
   const result = backupSchema.safeParse(json);
   if (!result.success) {
     const first = result.error.issues[0];
-    const where = first.path.length ? ` (bei ${first.path.join('.')})` : '';
-    throw new BackupError(`Die Sicherung ist beschädigt oder unvollständig${where}.`);
+    // Eigene Prüfungen haben eine verständliche Meldung, Formatfehler einen Pfad.
+    const detail =
+      first.code === 'custom'
+        ? `: ${first.message}`
+        : first.path.length
+          ? ` (bei ${first.path.join('.')})`
+          : '';
+    throw new BackupError(`Die Sicherung ist beschädigt oder unvollständig${detail}.`);
   }
   return result.data;
 }
@@ -219,9 +292,18 @@ export async function restoreBackup(db: SQLiteDatabase, b: Backup): Promise<stri
       );
     }
     for (const s of b.settings) {
-      if (s.key === 'lastBackupAt') continue;
       await db.runAsync('INSERT INTO settings (key, value) VALUES (?, ?)', s.key, s.value);
     }
+
+    // Den aktuellen Status nicht aus der Datei glauben, sondern wie in der
+    // App aus dem Verlauf ableiten: jüngster Eintrag gewinnt.
+    await db.execAsync(`
+      UPDATE applications SET status = (
+        SELECT e.status FROM status_events e
+        WHERE e.application_id = applications.id
+        ORDER BY e.date DESC, e.id DESC LIMIT 1
+      );
+    `);
   });
 
   return oldReminderIds;

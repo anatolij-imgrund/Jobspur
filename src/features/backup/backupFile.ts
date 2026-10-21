@@ -3,7 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 import type { Backup } from './backup';
-import { backupFileName } from './backup';
+import { BackupError, backupFileName, LIMITS } from './backup';
 
 /** Schreibt die Sicherung als Datei und öffnet den Teilen-Dialog. */
 export async function shareBackup(backup: Backup): Promise<void> {
@@ -33,12 +33,21 @@ export async function pickBackupText(): Promise<string | null> {
   });
   if (result.canceled) return null;
 
-  const { uri } = result.assets[0];
+  const { uri, size } = result.assets[0];
+  const tooBig = () =>
+    new BackupError('Die Datei ist zu groß für eine Sicherung dieser App (höchstens 5 MB).');
+  // Vor dem Lesen prüfen, damit eine riesige Datei gar nicht erst im Speicher landet.
+  if (size !== undefined && size > LIMITS.fileBytes) throw tooBig();
+
+  let text: string;
   try {
-    return await new File(uri).text();
+    text = await new File(uri).text();
   } catch {
     // In Expo Go darf die App nicht jeden Ordner direkt lesen; fetch klappt dort.
     const response = await fetch(uri);
-    return await response.text();
+    text = await response.text();
   }
+  // Nicht jeder Dateimanager liefert eine Größe mit; deshalb hier noch einmal.
+  if (text.length > LIMITS.fileBytes) throw tooBig();
+  return text;
 }
