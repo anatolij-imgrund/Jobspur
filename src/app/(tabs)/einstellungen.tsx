@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { listRecipients } from '@/db/recipients';
 import { getProfile } from '@/db/settings';
+import { BackupSection } from '@/features/backup/BackupSection';
 import { radius, space, type, useTheme } from '@/theme';
 import {
   hasPostalAddress,
@@ -20,14 +21,13 @@ export default function EinstellungenScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
 
-  useFocusEffect(
-    useCallback(() => {
-      Promise.all([getProfile(db), listRecipients(db)]).then(([p, r]) => {
-        setProfile(p);
-        setRecipients(r);
-      });
-    }, [db]),
-  );
+  const load = useCallback(() => {
+    Promise.all([getProfile(db), listRecipients(db)]).then(([p, r]) => {
+      setProfile(p);
+      setRecipients(r);
+    });
+  }, [db]);
+  useFocusEffect(load);
 
   if (!profile) return null;
 
@@ -120,13 +120,7 @@ export default function EinstellungenScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.ink }]}>Datensicherung</Text>
-        <Text style={[styles.intro, { color: theme.muted }]}>
-          Deine Daten liegen nur auf diesem Handy. Export und Import einer Sicherungsdatei kommen in
-          einem der nächsten Updates.
-        </Text>
-      </View>
+      <BackupSection onRestored={load} />
     </ScrollView>
   );
 }
