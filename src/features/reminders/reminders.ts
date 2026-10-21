@@ -19,18 +19,31 @@ Notifications?.setNotificationHandler({
 });
 
 /**
- * Legt den Android-Kanal an und fragt nach der Erlaubnis.
- * Auf Android 13+ erscheint die Abfrage erst, wenn ein Kanal existiert.
+ * Legt den eigenen Android-Kanal an. In Expo Go auf Android schlägt das
+ * mit einer NullPointerException im nativen Code fehl; dann nutzen wir
+ * den Standardkanal, den Android selbst bereitstellt.
  */
-export async function ensureNotificationPermission(): Promise<boolean> {
-  if (!Notifications) return false;
-  if (Platform.OS === 'android') {
+async function createChannel(): Promise<string | undefined> {
+  if (!Notifications || Platform.OS !== 'android') return undefined;
+  try {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: 'Gesprächstermine',
       description: 'Erinnerungen an Vorstellungsgespräche',
       importance: Notifications.AndroidImportance.HIGH,
     });
+    return CHANNEL_ID;
+  } catch (error) {
+    console.warn('Eigener Benachrichtigungskanal nicht möglich, nutze Standardkanal:', error);
+    return undefined;
   }
+}
+
+/**
+ * Fragt nach der Erlaubnis. Auf Android 13+ erscheint die Abfrage erst,
+ * wenn ein Kanal existiert, deshalb vorher createChannel().
+ */
+async function ensurePermission(): Promise<boolean> {
+  if (!Notifications) return false;
   const current = await Notifications.getPermissionsAsync();
   if (current.granted) return true;
   if (!current.canAskAgain) return false;
@@ -61,26 +74,45 @@ function texts(slot: ReminderSlot, i: Interview): { title: string; body: string 
   }
 }
 
-/** Plant die Erinnerungen und gibt ihre Ids zurück (zum späteren Absagen). */
-export async function scheduleInterviewReminders(
+export type ReminderResult =
+  | { ok: true; ids: string[] }
+  | { ok: false; reason: 'unavailable' | 'denied' | 'failed'; ids: string[] };
+
+/**
+ * Richtet alle Erinnerungen für ein Gespräch ein.
+ *
+ * Wirft nie: Der Termin ist zu diesem Zeitpunkt schon gespeichert, und ein
+ * Problem mit Erinnerungen darf das Speichern nicht rückgängig erscheinen
+ * lassen. Stattdessen sagt das Ergebnis, was passiert ist. Bereits
+ * geplante Erinnerungen stehen auch im Fehlerfall in `ids`.
+ */
+export async function setUpInterviewReminders(
   interview: Interview,
   now = new Date(),
-): Promise<string[]> {
-  if (!Notifications) return [];
+): Promise<ReminderResult> {
+  if (!Notifications) return { ok: false, reason: 'unavailable', ids: [] };
   const ids: string[] = [];
-  for (const slot of reminderSlots(interview.date, interview.time, now)) {
-    const { title, body } = texts(slot, interview);
-    const id = await Notifications.scheduleNotificationAsync({
-      content: { title, body, data: { applicationId: interview.applicationId } },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: slot.at,
-        channelId: CHANNEL_ID,
-      },
-    });
-    ids.push(id);
+  try {
+    const channelId = await createChannel();
+    if (!(await ensurePermission())) return { ok: false, reason: 'denied', ids };
+
+    for (const slot of reminderSlots(interview.date, interview.time, now)) {
+      const { title, body } = texts(slot, interview);
+      const id = await Notifications.scheduleNotificationAsync({
+        content: { title, body, data: { applicationId: interview.applicationId } },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: slot.at,
+          ...(channelId ? { channelId } : {}),
+        },
+      });
+      ids.push(id);
+    }
+    return { ok: true, ids };
+  } catch (error) {
+    console.warn('Erinnerung konnte nicht eingerichtet werden:', error);
+    return { ok: false, reason: 'failed', ids };
   }
-  return ids;
 }
 
 /** Sagt geplante Erinnerungen ab. Unbekannte oder schon gezeigte Ids sind kein Fehler. */

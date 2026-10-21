@@ -17,13 +17,8 @@ import {
 import { type Fact, FactList, toHref } from '@/features/application-detail/FactList';
 import { StatusChanger } from '@/features/application-detail/StatusChanger';
 import { StatusTimeline } from '@/features/application-detail/StatusTimeline';
-import {
-  cancelReminders,
-  ensureNotificationPermission,
-  scheduleInterviewReminders,
-} from '@/features/reminders/reminders';
+import { cancelReminders, setUpInterviewReminders } from '@/features/reminders/reminders';
 import { daysSince, formatDate, formatDaysAgo, formatWeekdayDate, toIsoDate } from '@/lib/dates';
-import { notificationsAvailable } from '@/lib/notifications';
 import { space, type, useTheme } from '@/theme';
 import {
   type Application,
@@ -212,31 +207,28 @@ export default function BewerbungDetailScreen() {
               });
               await cancelReminders(cancelledReminderIds);
 
+              // Ab hier ist der Termin gespeichert. Erinnerungen sind ein Zusatz:
+              // Klappt das nicht, sagen wir es, aber der Eintrag bleibt.
+              await load();
               if (options.remind) {
-                const allowed = await ensureNotificationPermission();
-                if (allowed) {
-                  const ids = await scheduleInterviewReminders({
-                    applicationId: id,
-                    company: app.company,
-                    position: app.position,
-                    date: event.date,
-                    time: event.time ?? null,
-                    mode: event.mode ?? null,
-                  });
-                  await setReminderIds(db, eventId, ids);
-                } else if (!notificationsAvailable) {
+                const result = await setUpInterviewReminders({
+                  applicationId: id,
+                  company: app.company,
+                  position: app.position,
+                  date: event.date,
+                  time: event.time ?? null,
+                  mode: event.mode ?? null,
+                });
+                if (result.ids.length) await setReminderIds(db, eventId, result.ids);
+                if (!result.ok) {
                   Alert.alert(
-                    'Erinnerungen nicht verfügbar',
-                    'Der Termin ist gespeichert. Erinnerungen funktionieren hier gerade nicht, in der fertigen App schon.',
-                  );
-                } else {
-                  Alert.alert(
-                    'Erinnerungen sind ausgeschaltet',
-                    'Der Termin ist gespeichert. Damit die App erinnern kann, erlaube Benachrichtigungen in den Android-Einstellungen unter Apps.',
+                    'Termin gespeichert, ohne Erinnerung',
+                    result.reason === 'denied'
+                      ? 'Damit die App erinnern kann, erlaube Benachrichtigungen in den Android-Einstellungen unter Apps.'
+                      : 'Die Erinnerung ließ sich hier nicht einrichten. In Expo Go auf Android klappt das nicht zuverlässig, in der fertigen App schon.',
                   );
                 }
               }
-              await load();
             }}
           />
         </View>
