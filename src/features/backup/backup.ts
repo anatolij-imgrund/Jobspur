@@ -5,7 +5,11 @@ import { LATEST_VERSION } from '@/db/schema';
 import { CHANNELS, INTERVIEW_MODES, SOURCES, STATUSES } from '@/types/application';
 import { RECIPIENT_KINDS } from '@/types/profile';
 
-/** Erkennungszeichen, damit nicht jede beliebige JSON-Datei eingelesen wird. */
+/**
+ * Erkennungszeichen, damit nicht jede beliebige JSON-Datei eingelesen wird.
+ * Bleibt bewusst beim alten Projektnamen: Sonst ließen sich Sicherungen von
+ * vor der Umbenennung in „Jobspur“ nicht mehr einlesen.
+ */
 const APP_ID = 'bewerbungstracker';
 
 /**
@@ -359,8 +363,8 @@ export function folderLabel(uri: string): string {
   return path || 'Interner Speicher';
 }
 
-/** Dateiname mit Datum, z. B. Bewerbungstracker_Sicherung_2026-10-21.json */
+/** Dateiname mit Datum, z. B. Jobspur_Sicherung_2026-10-21.json */
 export function backupFileName(now = new Date()): string {
   const d = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return `Bewerbungstracker_Sicherung_${d}.json`;
+  return `Jobspur_Sicherung_${d}.json`;
 }

@@ -308,7 +308,7 @@ export function renderReport({ data, profile, recipient, createdAt }: Options): 
   ${table}
   ${followUpTable}
   ${closing}
-  <p class="footer">Erstellt am ${formatDate(createdAt)} mit der App Bewerbungstracker.</p>
+  <p class="footer">Erstellt am ${formatDate(createdAt)} mit der App Jobspur.</p>
 </body>
 </html>`;
 }
