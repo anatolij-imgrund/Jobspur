@@ -57,6 +57,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ac185325-6c31-4e9f-b3aa-f3e593dc6ce8"
+      }
+    },
+    "owner": "anatolij-imgrund"
   }
 }
