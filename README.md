@@ -167,6 +167,16 @@ npm run lint        # ESLint
 > anlegen und nutzt den Standardkanal; Erinnerungen kommen trotzdem an. Icon
 > und Startbildschirm sind erst in einem echten Build zu sehen.
 
+### App bauen
+
+Gebaut wird in der Cloud mit [EAS Build](https://docs.expo.dev/build/introduction/),
+der Ordner `android/` entsteht dabei automatisch aus `app.json`.
+
+```bash
+npx eas-cli@latest build -p android --profile preview      # APK zum Installieren
+npx eas-cli@latest build -p android --profile production   # App Bundle für Google Play
+```
+
 ## Pläne
 
 - [ ] Veröffentlichung im Google Play Store
