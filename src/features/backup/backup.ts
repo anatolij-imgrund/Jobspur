@@ -163,7 +163,7 @@ export class BackupError extends Error {}
  * Einstellungen, die nur zu diesem Handy gehören. Sie kommen nicht in die
  * Sicherung und bleiben beim Wiederherstellen stehen.
  */
-const DEVICE_SETTINGS = ['lastBackupAt', 'backupFolderUri'] as const;
+const DEVICE_SETTINGS = ['lastBackupAt', 'backupFolderUri', 'appearance'] as const;
 const DEVICE_SETTINGS_SQL = DEVICE_SETTINGS.map((k) => `'${k}'`).join(', ');
 
 // ── Erstellen ───────────────────────────────────────────────────────

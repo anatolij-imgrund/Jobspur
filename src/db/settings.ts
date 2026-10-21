@@ -44,3 +44,18 @@ export async function saveProfile(db: SQLiteDatabase, profile: Profile): Promise
   ) as Profile;
   await setSetting(db, 'profile', JSON.stringify(trimmed));
 }
+
+// ── Darstellung ─────────────────────────────────────────────────────
+
+export const APPEARANCES = ['system', 'light', 'dark'] as const;
+export type Appearance = (typeof APPEARANCES)[number];
+
+/** Hell, dunkel oder wie das Handy; unbekannte Werte gelten als „wie das Handy“. */
+export async function getAppearance(db: SQLiteDatabase): Promise<Appearance> {
+  const value = await getSetting(db, 'appearance');
+  return APPEARANCES.find((a) => a === value) ?? 'system';
+}
+
+export async function saveAppearance(db: SQLiteDatabase, appearance: Appearance): Promise<void> {
+  await setSetting(db, 'appearance', appearance);
+}

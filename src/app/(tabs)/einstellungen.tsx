@@ -3,12 +3,20 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ChoiceGroup } from '@/components/form/ChoiceGroup';
 import { Icon } from '@/components/Icon';
 import { listRecipients } from '@/db/recipients';
-import { getProfile } from '@/db/settings';
+import {
+  type Appearance,
+  APPEARANCES,
+  getAppearance,
+  getProfile,
+  saveAppearance,
+} from '@/db/settings';
 import { BackupSection } from '@/features/backup/BackupSection';
 import { background } from '@/lib/background';
 import { radius, space, type, useTheme } from '@/theme';
+import { applyAppearance } from '@/theme/appearance';
 import {
   hasPostalAddress,
   type Profile,
@@ -16,22 +24,37 @@ import {
   RECIPIENT_KIND_LABELS,
 } from '@/types/profile';
 
+const APPEARANCE_LABELS: Record<Appearance, string> = {
+  system: 'Wie das Handy',
+  light: 'Hell',
+  dark: 'Dunkel',
+};
+
 export default function EinstellungenScreen() {
   const db = useSQLiteContext();
   const theme = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [appearance, setAppearance] = useState<Appearance>('system');
 
   const load = useCallback(() => {
     background(
-      Promise.all([getProfile(db), listRecipients(db)]).then(([p, r]) => {
+      Promise.all([getProfile(db), listRecipients(db), getAppearance(db)]).then(([p, r, a]) => {
         setProfile(p);
         setRecipients(r);
+        setAppearance(a);
       }),
       'Laden der Einstellungen',
     );
   }, [db]);
   useFocusEffect(load);
+
+  // Sofort umschalten, gespeichert wird im Hintergrund.
+  const changeAppearance = (value: Appearance) => {
+    setAppearance(value);
+    applyAppearance(value);
+    background(saveAppearance(db, value), 'Speichern der Darstellung');
+  };
 
   if (!profile) return null;
 
@@ -122,6 +145,17 @@ export default function EinstellungenScreen() {
           <Icon name="add" size={20} color={theme.accent} />
           <Text style={[styles.addText, { color: theme.accent }]}>Stelle hinzufügen</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.ink }]}>Darstellung</Text>
+        <ChoiceGroup
+          options={APPEARANCES}
+          labels={APPEARANCE_LABELS}
+          value={appearance}
+          onChange={changeAppearance}
+          accessibilityLabel="Darstellung"
+        />
       </View>
 
       <BackupSection onRestored={load} />

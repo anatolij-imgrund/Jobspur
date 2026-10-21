@@ -1,19 +1,30 @@
 import { Stack } from 'expo-router';
-import { SQLiteProvider } from 'expo-sqlite';
+import { type SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
+import { getAppearance } from '@/db/settings';
 // Setzt beim Import, wie Erinnerungen bei offener App angezeigt werden.
 import '@/features/reminders/reminders';
 import { useReminderTaps } from '@/features/reminders/useReminderTaps';
 import { useTheme } from '@/theme';
+import { applyAppearance } from '@/theme/appearance';
+
+/**
+ * Läuft, bevor der erste Bildschirm erscheint: Datenbank auf den neuesten
+ * Stand bringen und die gewählte Darstellung setzen, damit nichts aufblitzt.
+ */
+async function initApp(db: SQLiteDatabase): Promise<void> {
+  await migrateDbIfNeeded(db);
+  applyAppearance(await getAppearance(db));
+}
 
 export default function RootLayout() {
   const theme = useTheme();
   useReminderTaps();
 
   return (
-    <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrateDbIfNeeded}>
+    <SQLiteProvider databaseName={DATABASE_NAME} onInit={initApp}>
       <StatusBar style="auto" />
       <Stack
         screenOptions={{

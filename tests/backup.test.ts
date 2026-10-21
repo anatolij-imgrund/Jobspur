@@ -6,7 +6,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import * as A from '@/db/applications';
 import * as R from '@/db/recipients';
 import { insertSampleData } from '@/db/seed';
-import { getProfile, saveProfile } from '@/db/settings';
+import { getAppearance, getProfile, saveAppearance, saveProfile } from '@/db/settings';
 import {
   backupFileName,
   BackupError,
@@ -45,6 +45,7 @@ async function sourceDevice() {
   await A.setReminderIds(a.db, eventId, ['geraet-a-1']);
   await setLastBackupAt(a.db, '2026-10-21');
   await setBackupFolderUri(a.db, 'content://a/tree/primary%3ADownload');
+  await saveAppearance(a.db, 'dark');
   return a;
 }
 
@@ -68,19 +69,21 @@ describe('Sicherung erstellen und wiederherstellen', () => {
     assert.deepEqual(await snapshot(b.db), await snapshot(a.db));
   });
 
-  test('gerätebezogenes bleibt draußen: Erinnerungen, letzter Zeitpunkt, Ordner', async () => {
+  test('gerätebezogenes bleibt draußen: Erinnerungen, letzter Zeitpunkt, Ordner, Darstellung', async () => {
     const a = await sourceDevice();
     const text = JSON.stringify(await buildBackup(a.db));
-    for (const part of ['geraet-a-1', 'reminder_ids', 'lastBackupAt', 'backupFolderUri', 'content://']) {
+    for (const part of ['geraet-a-1', 'reminder_ids', 'lastBackupAt', 'backupFolderUri', 'appearance', 'content://']) {
       assert.ok(!text.includes(part), part);
     }
 
     const b = await makeDb();
     await setLastBackupAt(b.db, '2026-09-01');
     await setBackupFolderUri(b.db, 'content://b/tree/primary%3ADocuments');
+    await saveAppearance(b.db, 'light');
     await restoreBackup(b.db, parseBackup(text));
     assert.equal(await getLastBackupAt(b.db), '2026-09-01');
     assert.equal(await getBackupFolderUri(b.db), 'content://b/tree/primary%3ADocuments');
+    assert.equal(await getAppearance(b.db), 'light');
   });
 
   test('alte Daten werden ersetzt, ihre Erinnerungen zum Absagen zurückgegeben', async () => {
@@ -183,5 +186,16 @@ describe('Präparierte oder kaputte Sicherungsdateien', () => {
     ] })));
     assert.deepEqual(await getProfile(c.db), EMPTY_PROFILE);
     assert.equal((await c.db.getAllAsync('SELECT * FROM settings')).length, 0);
+  });
+});
+
+describe('Darstellung', () => {
+  test('ohne Wahl oder mit unbekanntem Wert gilt „wie das Handy“', async () => {
+    const { db } = await makeDb();
+    assert.equal(await getAppearance(db), 'system');
+    await saveAppearance(db, 'dark');
+    assert.equal(await getAppearance(db), 'dark');
+    await db.runAsync(`UPDATE settings SET value = 'lila' WHERE key = 'appearance'`);
+    assert.equal(await getAppearance(db), 'system');
   });
 });
