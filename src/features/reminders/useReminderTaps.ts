@@ -1,6 +1,7 @@
-import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
+
+import { type NotificationResponse, Notifications } from '@/lib/notifications';
 
 import { applicationIdFrom } from './reminders';
 
@@ -10,7 +11,10 @@ import { applicationIdFrom } from './reminders';
  */
 export function useReminderTaps() {
   useEffect(() => {
-    const open = (response: Notifications.NotificationResponse | null) => {
+    const api = Notifications;
+    if (!api) return;
+
+    const open = (response: NotificationResponse | null) => {
       const id = applicationIdFrom(response);
       if (id !== null) {
         router.push({ pathname: '/bewerbung/[id]', params: { id: String(id) } });
@@ -18,10 +22,10 @@ export function useReminderTaps() {
     };
 
     // App wurde durch das Antippen gestartet
-    open(Notifications.getLastNotificationResponse());
-    Notifications.clearLastNotificationResponse();
+    open(api.getLastNotificationResponse());
+    api.clearLastNotificationResponse();
 
-    const subscription = Notifications.addNotificationResponseReceivedListener(open);
+    const subscription = api.addNotificationResponseReceivedListener(open);
     return () => subscription.remove();
   }, []);
 }

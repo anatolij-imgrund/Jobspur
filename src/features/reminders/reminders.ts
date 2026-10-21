@@ -1,7 +1,7 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { formatWeekdayDate } from '@/lib/dates';
+import { type NotificationResponse, Notifications } from '@/lib/notifications';
 import { INTERVIEW_MODE_LABELS, type InterviewMode } from '@/types/application';
 
 import { reminderSlots, type ReminderSlot } from './reminderTimes';
@@ -9,7 +9,7 @@ import { reminderSlots, type ReminderSlot } from './reminderTimes';
 const CHANNEL_ID = 'termine';
 
 // Erinnerungen auch anzeigen, wenn die App gerade offen ist.
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -23,6 +23,7 @@ Notifications.setNotificationHandler({
  * Auf Android 13+ erscheint die Abfrage erst, wenn ein Kanal existiert.
  */
 export async function ensureNotificationPermission(): Promise<boolean> {
+  if (!Notifications) return false;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: 'Gesprächstermine',
@@ -65,6 +66,7 @@ export async function scheduleInterviewReminders(
   interview: Interview,
   now = new Date(),
 ): Promise<string[]> {
+  if (!Notifications) return [];
   const ids: string[] = [];
   for (const slot of reminderSlots(interview.date, interview.time, now)) {
     const { title, body } = texts(slot, interview);
@@ -83,15 +85,15 @@ export async function scheduleInterviewReminders(
 
 /** Sagt geplante Erinnerungen ab. Unbekannte oder schon gezeigte Ids sind kein Fehler. */
 export async function cancelReminders(ids: string[]): Promise<void> {
+  const api = Notifications;
+  if (!api) return;
   await Promise.all(
-    ids.map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => undefined)),
+    ids.map((id) => api.cancelScheduledNotificationAsync(id).catch(() => undefined)),
   );
 }
 
 /** Id der Bewerbung aus einer angetippten Erinnerung. */
-export function applicationIdFrom(
-  response: Notifications.NotificationResponse | null | undefined,
-): number | null {
+export function applicationIdFrom(response: NotificationResponse | null | undefined): number | null {
   const id = response?.notification.request.content.data?.applicationId;
   return typeof id === 'number' ? id : null;
 }

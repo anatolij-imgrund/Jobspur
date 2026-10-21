@@ -23,6 +23,7 @@ import {
   scheduleInterviewReminders,
 } from '@/features/reminders/reminders';
 import { daysSince, formatDate, formatDaysAgo, formatWeekdayDate, toIsoDate } from '@/lib/dates';
+import { notificationsAvailable } from '@/lib/notifications';
 import { space, type, useTheme } from '@/theme';
 import {
   type Application,
@@ -223,6 +224,11 @@ export default function BewerbungDetailScreen() {
                     mode: event.mode ?? null,
                   });
                   await setReminderIds(db, eventId, ids);
+                } else if (!notificationsAvailable) {
+                  Alert.alert(
+                    'Erinnerungen nicht verfügbar',
+                    'Der Termin ist gespeichert. Erinnerungen funktionieren hier gerade nicht, in der fertigen App schon.',
+                  );
                 } else {
                   Alert.alert(
                     'Erinnerungen sind ausgeschaltet',
