@@ -14,6 +14,7 @@ import {
   toFormValues,
   toNewApplication,
 } from '@/features/application-form/schema';
+import { background } from '@/lib/background';
 
 type Loaded =
   | { state: 'loading' }
@@ -27,7 +28,7 @@ export default function BewerbungBearbeitenScreen() {
   const [data, setData] = useState<Loaded>({ state: 'loading' });
 
   useEffect(() => {
-    (async () => {
+    const load = async () => {
       const app = await getApplication(db, id);
       if (!app) {
         setData({ state: 'missing' });
@@ -35,7 +36,8 @@ export default function BewerbungBearbeitenScreen() {
       }
       const latestAppliedAt = await getEarliestFollowUpDate(db, id);
       setData({ state: 'ready', values: toFormValues(app), latestAppliedAt });
-    })();
+    };
+    background(load(), 'Laden der Bewerbung');
   }, [db, id]);
 
   if (data.state === 'loading') return null;

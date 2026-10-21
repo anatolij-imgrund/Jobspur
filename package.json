@@ -38,7 +38,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -46,7 +50,12 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "eslint .",
+    "test": "node --disable-warning=ExperimentalWarning --import tsx --test --test-reporter=spec \"tests/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  }
 }

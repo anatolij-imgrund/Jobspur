@@ -18,6 +18,7 @@ import { type Fact, FactList, toHref } from '@/features/application-detail/FactL
 import { StatusChanger } from '@/features/application-detail/StatusChanger';
 import { StatusTimeline } from '@/features/application-detail/StatusTimeline';
 import { cancelReminders, setUpInterviewReminders } from '@/features/reminders/reminders';
+import { background } from '@/lib/background';
 import { daysSince, formatDate, formatDaysAgo, formatWeekdayDate, toIsoDate } from '@/lib/dates';
 import { space, type, useTheme } from '@/theme';
 import {
@@ -62,7 +63,7 @@ export default function BewerbungDetailScreen() {
   // Auch nach dem Zurückkommen vom Bearbeiten neu laden.
   useFocusEffect(
     useCallback(() => {
-      load();
+      background(load(), 'Laden der Bewerbung');
     }, [load]),
   );
 

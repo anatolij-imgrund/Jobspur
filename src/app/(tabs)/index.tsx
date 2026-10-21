@@ -14,8 +14,9 @@ import {
   listUpcomingInterviews,
   type UpcomingInterview,
 } from '@/db/applications';
-import { UpcomingInterviews } from '@/features/overview/UpcomingInterviews';
 import { insertSampleData } from '@/db/seed';
+import { UpcomingInterviews } from '@/features/overview/UpcomingInterviews';
+import { background } from '@/lib/background';
 import { formatMonthKey, monthKey, toIsoDate } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
 import type { Application, Status } from '@/types/application';
@@ -71,7 +72,7 @@ export default function OverviewScreen() {
   // und wenn sich Suche oder Filter ändern.
   useFocusEffect(
     useCallback(() => {
-      load();
+      background(load(), 'Laden der Bewerbungen');
     }, [load]),
   );
 

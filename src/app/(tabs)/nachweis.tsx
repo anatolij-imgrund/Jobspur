@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ChoiceGroup } from '@/components/form/ChoiceGroup';
@@ -16,6 +16,7 @@ import {
   reportStats,
   reportTitle,
 } from '@/features/report/renderReport';
+import { background } from '@/lib/background';
 import { type DateRange, formatDate, presetRange, toIsoDate } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
 import { hasPostalAddress, type Profile, type Recipient } from '@/types/profile';
@@ -43,7 +44,9 @@ export default function NachweisScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
   const [busy, setBusy] = useState<'share' | 'print' | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Die Fehlermeldung gehört zu einer bestimmten Auswahl; ändert sich
+  // Zeitraum oder Empfänger, verschwindet sie von selbst.
+  const [failure, setFailure] = useState<{ message: string; key: string } | null>(null);
 
   const range = preset === 'custom' ? custom : presetRange(preset);
   const rangeInvalid = range.from > range.to;
@@ -52,12 +55,15 @@ export default function NachweisScreen() {
   // Empfänger und Profil neu laden, wenn man aus den Einstellungen zurückkommt.
   useFocusEffect(
     useCallback(() => {
-      Promise.all([listRecipients(db), getProfile(db)]).then(([r, p]) => {
-        setRecipients(r);
-        setProfile(p);
-        // Gelöschte Stelle nicht ausgewählt lassen.
-        setRecipientKey((key) => (key === FOR_ME || r.some((x) => String(x.id) === key) ? key : FOR_ME));
-      });
+      background(
+        Promise.all([listRecipients(db), getProfile(db)]).then(([r, p]) => {
+          setRecipients(r);
+          setProfile(p);
+          // Gelöschte Stelle nicht ausgewählt lassen.
+          setRecipientKey((key) => (key === FOR_ME || r.some((x) => String(x.id) === key) ? key : FOR_ME));
+        }),
+        'Laden der Empfänger',
+      );
     }, [db]),
   );
 
@@ -65,10 +71,12 @@ export default function NachweisScreen() {
   const { from, to } = range;
   const loadData = useCallback(() => {
     if (from > to) return;
-    getReportData(db, from, to).then(setData);
+    background(getReportData(db, from, to).then(setData), 'Laden der Vorschau');
   }, [db, from, to]);
   useFocusEffect(loadData);
-  useEffect(() => setError(null), [from, to, recipientKey]);
+
+  const selectionKey = `${from}|${to}|${recipientKey}`;
+  const error = failure?.key === selectionKey ? failure.message : null;
 
   const stats = data && !rangeInvalid ? reportStats(data) : null;
   const missingName = recipient !== null && !profile?.name;
@@ -86,13 +94,16 @@ export default function NachweisScreen() {
 
   const share = async () => {
     setBusy('share');
-    setError(null);
+    setFailure(null);
     try {
       const uri = await createPdf(await buildHtml(), reportFileName(recipient, from, to));
       await sharePdf(uri, reportTitle(recipient));
     } catch (e) {
       console.error(e);
-      setError('Das PDF konnte nicht erstellt werden. Bitte versuche es noch einmal.');
+      setFailure({
+        message: 'Das PDF konnte nicht erstellt werden. Bitte versuche es noch einmal.',
+        key: selectionKey,
+      });
     } finally {
       setBusy(null);
     }
@@ -100,7 +111,7 @@ export default function NachweisScreen() {
 
   const print = async () => {
     setBusy('print');
-    setError(null);
+    setFailure(null);
     try {
       await printHtml(await buildHtml());
     } catch (e) {

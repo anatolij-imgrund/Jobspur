@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 
 import { cancelReminders } from '@/features/reminders/reminders';
 import { rescheduleUpcomingReminders } from '@/features/reminders/reschedule';
+import { background } from '@/lib/background';
 import { daysSince, formatDate, formatDaysAgo, toIsoDate } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
 
@@ -47,8 +48,8 @@ export function BackupSection({ onRestored }: { onRestored: () => void }) {
 
   useFocusEffect(
     useCallback(() => {
-      getLastBackupAt(db).then(setLast);
-      getBackupFolderUri(db).then(setFolderUri);
+      background(getLastBackupAt(db).then(setLast), 'Laden der letzten Sicherung');
+      background(getBackupFolderUri(db).then(setFolderUri), 'Laden des Sicherungsordners');
     }, [db]),
   );
 

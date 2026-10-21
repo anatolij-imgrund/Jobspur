@@ -7,6 +7,7 @@ import { Icon } from '@/components/Icon';
 import { listRecipients } from '@/db/recipients';
 import { getProfile } from '@/db/settings';
 import { BackupSection } from '@/features/backup/BackupSection';
+import { background } from '@/lib/background';
 import { radius, space, type, useTheme } from '@/theme';
 import {
   hasPostalAddress,
@@ -22,10 +23,13 @@ export default function EinstellungenScreen() {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
 
   const load = useCallback(() => {
-    Promise.all([getProfile(db), listRecipients(db)]).then(([p, r]) => {
-      setProfile(p);
-      setRecipients(r);
-    });
+    background(
+      Promise.all([getProfile(db), listRecipients(db)]).then(([p, r]) => {
+        setProfile(p);
+        setRecipients(r);
+      }),
+      'Laden der Einstellungen',
+    );
   }, [db]);
   useFocusEffect(load);
 

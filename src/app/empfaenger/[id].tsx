@@ -11,6 +11,7 @@ import {
   toNewRecipient,
   toRecipientValues,
 } from '@/features/settings/schemas';
+import { background } from '@/lib/background';
 import { space, type, useTheme } from '@/theme';
 
 type Loaded =
@@ -26,8 +27,11 @@ export default function EmpfaengerBearbeitenScreen() {
   const [data, setData] = useState<Loaded>({ state: 'loading' });
 
   useEffect(() => {
-    getRecipient(db, id).then((r) =>
-      setData(r ? { state: 'ready', values: toRecipientValues(r), name: r.name } : { state: 'missing' }),
+    background(
+      getRecipient(db, id).then((r) =>
+        setData(r ? { state: 'ready', values: toRecipientValues(r), name: r.name } : { state: 'missing' }),
+      ),
+      'Laden der Stelle',
     );
   }, [db, id]);
 

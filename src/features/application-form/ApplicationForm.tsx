@@ -8,10 +8,10 @@ import { DateField } from '@/components/form/DateField';
 import { Field } from '@/components/form/Field';
 import { FormGroupTitle, FormLayout } from '@/components/form/FormLayout';
 import { TextField } from '@/components/form/TextField';
+import { useDiscardGuard } from '@/hooks/useDiscardGuard';
 import { formatDate } from '@/lib/dates';
 import { CHANNEL_LABELS, CHANNELS, SOURCE_LABELS, SOURCES } from '@/types/application';
 
-import { useDiscardGuard } from '@/hooks/useDiscardGuard';
 import { applicationFormSchema, type ApplicationFormValues } from './schema';
 
 type Props = {

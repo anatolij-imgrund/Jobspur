@@ -1,6 +1,7 @@
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/Icon';
+import { useNow } from '@/hooks/useNow';
 import { formatDate, toLocalDateTime } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
 import { INTERVIEW_MODE_LABELS, STATUS_LABELS, type StatusEvent } from '@/types/application';
@@ -17,7 +18,7 @@ type Props = {
 export function StatusTimeline({ events, firstEventId, onDelete }: Props) {
   const theme = useTheme();
 
-  const now = Date.now();
+  const now = useNow();
   const isPlanned = (e: StatusEvent) =>
     e.status === 'interview' && toLocalDateTime(e.date, e.time ?? '23:59').getTime() > now;
 

@@ -6,6 +6,7 @@ import { DateField } from '@/components/form/DateField';
 import { Field } from '@/components/form/Field';
 import { TextField } from '@/components/form/TextField';
 import { TimeField } from '@/components/form/TimeField';
+import { useNow } from '@/hooks/useNow';
 import { formatDate, formatWeekdayDate, toIsoDate, toLocalDateTime } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
 import {
@@ -59,6 +60,7 @@ function confirm(title: string, message: string, ok: string): Promise<boolean> {
  */
 export function StatusChanger({ current, floorDate, upcomingInterview, onSave }: Props) {
   const theme = useTheme();
+  const now = useNow();
   const [selected, setSelected] = useState<Status | null>(null);
   const [date, setDate] = useState(() => toIsoDate(new Date()));
   const [time, setTime] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export function StatusChanger({ current, floorDate, upcomingInterview, onSave }:
 
   const options = NEXT_STATUSES[current];
   const isInterview = selected === 'interview';
-  const inFuture = toLocalDateTime(date, time ?? '23:59').getTime() > Date.now();
+  const inFuture = toLocalDateTime(date, time ?? '23:59').getTime() > now;
 
   const reset = () => {
     setSelected(null);

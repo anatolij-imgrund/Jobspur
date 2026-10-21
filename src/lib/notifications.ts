@@ -12,14 +12,14 @@
  *
  * Mit einem Development Build kann man auf den normalen Import zurückwechseln.
  */
-import type * as Emitter from 'expo-notifications/build/NotificationsEmitter';
-import type * as Handler from 'expo-notifications/build/NotificationsHandler';
-import type * as Permissions from 'expo-notifications/build/NotificationPermissions';
-import type * as Channel from 'expo-notifications/build/setNotificationChannelAsync';
-import type * as Schedule from 'expo-notifications/build/scheduleNotificationAsync';
 import type * as Cancel from 'expo-notifications/build/cancelScheduledNotificationAsync';
 import type * as ChannelTypes from 'expo-notifications/build/NotificationChannelManager.types';
+import type * as Permissions from 'expo-notifications/build/NotificationPermissions';
 import type * as Types from 'expo-notifications/build/Notifications.types';
+import type * as Emitter from 'expo-notifications/build/NotificationsEmitter';
+import type * as Handler from 'expo-notifications/build/NotificationsHandler';
+import type * as Schedule from 'expo-notifications/build/scheduleNotificationAsync';
+import type * as Channel from 'expo-notifications/build/setNotificationChannelAsync';
 
 export type { NotificationResponse } from 'expo-notifications/build/Notifications.types';
 
