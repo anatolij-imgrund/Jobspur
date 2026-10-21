@@ -9,14 +9,13 @@ import { listRecipients } from '@/db/recipients';
 import {
   type Appearance,
   APPEARANCES,
-  getAppearance,
   getProfile,
   saveAppearance,
 } from '@/db/settings';
 import { BackupSection } from '@/features/backup/BackupSection';
 import { background } from '@/lib/background';
 import { radius, space, type, useTheme } from '@/theme';
-import { applyAppearance } from '@/theme/appearance';
+import { useAppearance } from '@/theme/appearance';
 import {
   hasPostalAddress,
   type Profile,
@@ -35,14 +34,13 @@ export default function EinstellungenScreen() {
   const theme = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
-  const [appearance, setAppearance] = useState<Appearance>('system');
+  const { appearance, setAppearance } = useAppearance();
 
   const load = useCallback(() => {
     background(
-      Promise.all([getProfile(db), listRecipients(db), getAppearance(db)]).then(([p, r, a]) => {
+      Promise.all([getProfile(db), listRecipients(db)]).then(([p, r]) => {
         setProfile(p);
         setRecipients(r);
-        setAppearance(a);
       }),
       'Laden der Einstellungen',
     );
@@ -52,7 +50,6 @@ export default function EinstellungenScreen() {
   // Sofort umschalten, gespeichert wird im Hintergrund.
   const changeAppearance = (value: Appearance) => {
     setAppearance(value);
-    applyAppearance(value);
     background(saveAppearance(db, value), 'Speichern der Darstellung');
   };
 

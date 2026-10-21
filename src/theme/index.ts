@@ -1,6 +1,7 @@
-import { useColorScheme } from 'react-native';
-
 import type { Status } from '@/types/application';
+
+import { useResolvedScheme } from './appearance';
+
 
 /**
  * Kühles Papierweiß, tiefe Tinte, Tannengrün als einziger Akzent.
@@ -49,7 +50,7 @@ const dark: typeof light = {
 export type Theme = typeof light;
 
 export function useTheme(): Theme {
-  return useColorScheme() === 'dark' ? dark : light;
+  return useResolvedScheme() === 'dark' ? dark : light;
 }
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;

@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { type SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
+import { useCallback } from 'react';
 
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
 import { getAppearance } from '@/db/settings';
@@ -8,24 +9,35 @@ import { getAppearance } from '@/db/settings';
 import '@/features/reminders/reminders';
 import { useReminderTaps } from '@/features/reminders/useReminderTaps';
 import { useTheme } from '@/theme';
-import { applyAppearance } from '@/theme/appearance';
-
-/**
- * Läuft, bevor der erste Bildschirm erscheint: Datenbank auf den neuesten
- * Stand bringen und die gewählte Darstellung setzen, damit nichts aufblitzt.
- */
-async function initApp(db: SQLiteDatabase): Promise<void> {
-  await migrateDbIfNeeded(db);
-  applyAppearance(await getAppearance(db));
-}
+import { AppearanceProvider, useAppearance, useResolvedScheme } from '@/theme/appearance';
 
 export default function RootLayout() {
+  return (
+    <AppearanceProvider>
+      <AppStack />
+    </AppearanceProvider>
+  );
+}
+
+function AppStack() {
   const theme = useTheme();
+  const scheme = useResolvedScheme();
+  const { setAppearance } = useAppearance();
   useReminderTaps();
+
+  // Läuft, bevor der erste Bildschirm erscheint: Datenbank auf den neuesten
+  // Stand bringen und die gewählte Darstellung setzen, damit nichts aufblitzt.
+  const initApp = useCallback(
+    async (db: SQLiteDatabase) => {
+      await migrateDbIfNeeded(db);
+      setAppearance(await getAppearance(db));
+    },
+    [setAppearance],
+  );
 
   return (
     <SQLiteProvider databaseName={DATABASE_NAME} onInit={initApp}>
-      <StatusBar style="auto" />
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: theme.background },
