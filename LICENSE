@@ -1,21 +1,40 @@
-The MIT License (MIT)
+Copyright (c) 2026 Anatolij Imgrund
+Alle Rechte vorbehalten. / All rights reserved.
 
-Copyright (c) 2015-present 650 Industries, Inc. (aka Expo)
+DEUTSCH
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Der Quellcode von Jobspur ist öffentlich einsehbar, damit sich die Arbeit
+daran nachvollziehen lässt. Er ist keine freie Software.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Ohne vorherige schriftliche Erlaubnis des Rechteinhabers ist es nicht
+gestattet, den Code oder Teile davon zu kopieren, zu verändern, zu
+verbreiten, unter eigenem Namen zu veröffentlichen, in App-Stores
+anzubieten oder kommerziell zu nutzen. Das gilt ebenso für das App-Icon,
+die Bildmarke und den Namen „Jobspur“.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Ansehen und das Erstellen von Forks auf GitHub im Rahmen der
+GitHub-Nutzungsbedingungen bleiben davon unberührt.
+
+Ausgenommen sind Bestandteile Dritter: Die eingebundenen Bibliotheken
+stehen unter ihren eigenen Lizenzen. Teile des Projektgerüsts stammen aus
+der Vorlage von create-expo-app (650 Industries, Inc., MIT-Lizenz).
+
+Anfragen zur Nutzung bitte über GitHub:
+https://github.com/anatolij-imgrund
+
+ENGLISH
+
+The source code of Jobspur is publicly visible so that the work behind it
+can be reviewed. It is not free software.
+
+Without prior written permission from the copyright holder you may not
+copy, modify, distribute, republish under your own name, offer in app
+stores or use commercially the code or any part of it. The same applies
+to the app icon, the logo mark and the name "Jobspur".
+
+Viewing the code and forking it on GitHub as permitted by the GitHub
+Terms of Service remain unaffected.
+
+Third-party components are excluded: the bundled libraries are subject to
+their own licenses. Parts of the project scaffold come from the
+create-expo-app template (650 Industries, Inc., MIT License).
