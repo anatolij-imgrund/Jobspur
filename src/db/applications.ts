@@ -116,12 +116,16 @@ export async function getApplication(
   return row ? toApplication(row) : null;
 }
 
-/** Legt eine Bewerbung an und schreibt den ersten Eintrag im Statusverlauf. */
+/**
+ * Legt eine Bewerbung an und schreibt „Beworben“ als ersten Eintrag in den
+ * Verlauf. Dieser Eintrag lässt sich später nicht löschen; deshalb ist er
+ * immer „Beworben“ und nie ein anderer Status.
+ */
 export async function createApplication(
   db: SQLiteDatabase,
   input: NewApplication,
 ): Promise<number> {
-  const status = input.status ?? 'applied';
+  const status: Status = 'applied';
   let id = 0;
 
   await db.withTransactionAsync(async () => {

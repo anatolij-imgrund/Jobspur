@@ -34,10 +34,11 @@ export type Application = {
   nextInterview?: { date: string; time: string | null } | null;
 };
 
+/** Neue Bewerbungen beginnen immer mit „Beworben“; alles Weitere kommt über den Verlauf. */
 export type NewApplication = Omit<
   Application,
   'id' | 'status' | 'createdAt' | 'updatedAt' | 'nextInterview'
-> & { status?: Status };
+>;
 
 export const INTERVIEW_MODES = ['onsite', 'video', 'phone'] as const;
 export type InterviewMode = (typeof INTERVIEW_MODES)[number];

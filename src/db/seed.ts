@@ -1,9 +1,9 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { toIsoDate } from '@/lib/dates';
-import type { NewApplication } from '@/types/application';
+import type { NewApplication, NewStatusEvent } from '@/types/application';
 
-import { createApplication } from './applications';
+import { addStatusEvent, createApplication } from './applications';
 
 function daysAgo(n: number): string {
   const d = new Date();
@@ -11,77 +11,81 @@ function daysAgo(n: number): string {
   return toIsoDate(d);
 }
 
-/** Nur für die Entwicklung: füllt die Liste mit erfundenen Beispielen. */
+type Sample = NewApplication & { history?: NewStatusEvent[] };
+
+const base = {
+  contactName: null,
+  contactEmail: null,
+  jobUrl: null,
+  notes: null,
+} as const;
+
+/**
+ * Nur für die Entwicklung: füllt die Liste mit erfundenen Beispielen.
+ * Der Verlauf entsteht wie in der echten App: erst „Beworben“, dann
+ * jede Rückmeldung als eigener Eintrag.
+ */
 export async function insertSampleData(db: SQLiteDatabase): Promise<void> {
-  const samples: NewApplication[] = [
+  const samples: Sample[] = [
     {
+      ...base,
       company: 'Nordlicht Software GmbH',
       position: 'Junior Frontend-Entwickler (React)',
       appliedAt: daysAgo(1),
       channel: 'portal',
       source: 'own',
-      status: 'applied',
       location: 'Köln',
-      contactName: null,
-      contactEmail: null,
-      jobUrl: null,
-      notes: null,
     },
     {
+      ...base,
       company: 'Stadtwerke Beispielstadt',
       position: 'Anwendungsentwickler (m/w/d)',
-      appliedAt: daysAgo(4),
+      appliedAt: daysAgo(8),
       channel: 'email',
       source: 'referral',
-      status: 'interview',
       location: 'Beispielstadt',
       contactName: 'Frau Berger',
-      contactEmail: null,
-      jobUrl: null,
-      notes: 'Gespräch per Video',
+      history: [
+        { status: 'confirmed', date: daysAgo(6), note: null },
+        { status: 'interview', date: daysAgo(2), note: 'Gespräch per Video', time: '10:00', mode: 'video' },
+      ],
     },
     {
+      ...base,
       company: 'Fahrwerk Logistik AG',
       position: 'Softwareentwickler C# / .NET',
       appliedAt: daysAgo(9),
       channel: 'email',
       source: 'own',
-      status: 'confirmed',
       location: 'Nürnberg',
-      contactName: null,
-      contactEmail: null,
-      jobUrl: null,
-      notes: null,
+      history: [{ status: 'confirmed', date: daysAgo(7), note: null }],
     },
     {
+      ...base,
       company: 'Pixelwerk Agentur',
       position: 'Web-Entwickler Next.js',
       appliedAt: daysAgo(15),
       channel: 'portal',
       source: 'own',
-      status: 'rejected',
       location: 'Remote',
-      contactName: null,
-      contactEmail: null,
-      jobUrl: null,
-      notes: null,
+      history: [{ status: 'rejected', date: daysAgo(5), note: 'Absage per E-Mail' }],
     },
     {
+      ...base,
       company: 'Brückner Maschinenbau',
       position: 'IT-Fachkraft Anwendungsbetreuung',
       appliedAt: daysAgo(38),
       channel: 'post',
       source: 'referral',
-      status: 'no_response',
       location: 'Augsburg',
-      contactName: null,
-      contactEmail: null,
-      jobUrl: null,
-      notes: null,
+      history: [{ status: 'no_response', date: daysAgo(3), note: null }],
     },
   ];
 
-  for (const sample of samples) {
-    await createApplication(db, sample);
+  for (const { history = [], ...application } of samples) {
+    const id = await createApplication(db, application);
+    for (const event of history) {
+      await addStatusEvent(db, id, event);
+    }
   }
 }

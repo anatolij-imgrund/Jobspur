@@ -1,3 +1,4 @@
+import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
 import { formatWeekdayDate } from '@/lib/dates';
@@ -19,12 +20,15 @@ Notifications?.setNotificationHandler({
 });
 
 /**
- * Legt den eigenen Android-Kanal an. In Expo Go auf Android schlägt das
- * mit einer NullPointerException im nativen Code fehl; dann nutzen wir
- * den Standardkanal, den Android selbst bereitstellt.
+ * Legt den eigenen Android-Kanal an.
+ *
+ * In Expo Go auf Android schlägt das mit einer NullPointerException im
+ * nativen Code fehl. Dort nutzen wir gleich den Standardkanal; die
+ * Erinnerung kommt trotzdem an. In der fertigen App gibt es den eigenen
+ * Kanal, den man in den Android-Einstellungen getrennt steuern kann.
  */
 async function createChannel(): Promise<string | undefined> {
-  if (!Notifications || Platform.OS !== 'android') return undefined;
+  if (!Notifications || Platform.OS !== 'android' || isRunningInExpoGo()) return undefined;
   try {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: 'Gesprächstermine',
