@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/anatolij-imgrund/bewerbungstracker/actions/workflows/ci.yml"><img src="https://github.com/anatolij-imgrund/bewerbungstracker/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/anatolij-imgrund/Jobspur/actions/workflows/ci.yml"><img src="https://github.com/anatolij-imgrund/Jobspur/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Expo_SDK-57-1F6B57" alt="Expo SDK 57">
   <img src="https://img.shields.io/badge/TypeScript-strict-1F6B57" alt="TypeScript strict">
   <img src="https://img.shields.io/badge/Plattform-Android-1F6B57" alt="Android">
@@ -147,8 +147,8 @@ Voraussetzungen: Node.js 22.13 oder neuer, ein Android-Handy mit
 [Expo Go](https://expo.dev/go) oder ein Emulator aus Android Studio.
 
 ```bash
-git clone https://github.com/anatolij-imgrund/bewerbungstracker.git
-cd bewerbungstracker
+git clone https://github.com/anatolij-imgrund/Jobspur.git
+cd Jobspur
 npm install
 npx expo start
 ```
