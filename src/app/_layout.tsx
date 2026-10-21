@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { type SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback } from 'react';
+import { type ReactNode, useCallback } from 'react';
 
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
 import { getAppearance } from '@/db/settings';
@@ -14,19 +14,20 @@ import { AppearanceProvider, useAppearance, useResolvedScheme } from '@/theme/ap
 export default function RootLayout() {
   return (
     <AppearanceProvider>
-      <AppStack />
+      <Database>
+        <AppStack />
+      </Database>
     </AppearanceProvider>
   );
 }
 
-function AppStack() {
-  const theme = useTheme();
-  const scheme = useResolvedScheme();
+/**
+ * Öffnet die Datenbank. Läuft, bevor der erste Bildschirm erscheint:
+ * Schema auf den neuesten Stand bringen und die gewählte Darstellung setzen,
+ * damit nichts aufblitzt.
+ */
+function Database({ children }: { children: ReactNode }) {
   const { setAppearance } = useAppearance();
-  useReminderTaps();
-
-  // Läuft, bevor der erste Bildschirm erscheint: Datenbank auf den neuesten
-  // Stand bringen und die gewählte Darstellung setzen, damit nichts aufblitzt.
   const initApp = useCallback(
     async (db: SQLiteDatabase) => {
       await migrateDbIfNeeded(db);
@@ -37,6 +38,23 @@ function AppStack() {
 
   return (
     <SQLiteProvider databaseName={DATABASE_NAME} onInit={initApp}>
+      {children}
+    </SQLiteProvider>
+  );
+}
+
+/**
+ * Die Navigation mit Farben aus der Darstellung. Muss ein eigener Baustein
+ * innerhalb von SQLiteProvider sein: Der zeichnet seine Kinder nur neu, wenn
+ * sich die Datenbank ändert, sonst blieben Kopfleisten in der alten Farbe.
+ */
+function AppStack() {
+  const theme = useTheme();
+  const scheme = useResolvedScheme();
+  useReminderTaps();
+
+  return (
+    <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
@@ -67,6 +85,6 @@ function AppStack() {
           options={{ title: 'Stelle bearbeiten', presentation: 'modal' }}
         />
       </Stack>
-    </SQLiteProvider>
+    </>
   );
 }
