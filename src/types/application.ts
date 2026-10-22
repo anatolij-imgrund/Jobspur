@@ -1,4 +1,5 @@
 export const STATUSES = [
+  'saved',
   'applied',
   'confirmed',
   'interview',
@@ -34,7 +35,10 @@ export type Application = {
   nextInterview?: { date: string; time: string | null } | null;
 };
 
-/** Neue Bewerbungen beginnen immer mit „Beworben“; alles Weitere kommt über den Verlauf. */
+/**
+ * Neue Bewerbungen beginnen mit „Beworben“ oder „Vorgemerkt“ (siehe
+ * createApplication); alles Weitere kommt über den Verlauf.
+ */
 export type NewApplication = Omit<
   Application,
   'id' | 'status' | 'createdAt' | 'updatedAt' | 'nextInterview'
@@ -73,6 +77,7 @@ export type NewStatusEvent = {
 };
 
 export const STATUS_LABELS: Record<Status, string> = {
+  saved: 'Vorgemerkt',
   applied: 'Beworben',
   confirmed: 'Eingang bestätigt',
   interview: 'Gespräch',
@@ -104,12 +109,26 @@ export function isFinal(status: Status): boolean {
   return FINAL_STATUSES.includes(status);
 }
 
+/** Womit eine neue Bewerbung beginnt: abgeschickt oder erst vorgemerkt. */
+export const STAGES = ['applied', 'saved'] as const;
+export type Stage = (typeof STAGES)[number];
+
+/**
+ * Vorgemerkte Stellen sind noch keine Bewerbung: Sie stehen nicht im
+ * Nachweis und zählen nicht im Monat.
+ */
+export function isSaved(status: Status): boolean {
+  return status === 'saved';
+}
+
 /**
  * Welcher Status nach welchem sinnvoll ist. „Eingang bestätigt“ nach einem
  * Gespräch ergibt keinen Sinn; nach „Keine Antwort“ kann sich die Firma
  * aber doch noch melden.
  */
 export const NEXT_STATUSES: Record<Status, readonly Status[]> = {
+  // Vorgemerkte Stellen werden erst zur Bewerbung, wenn sie abgeschickt sind.
+  saved: ['applied'],
   applied: ['confirmed', 'interview', 'offer', 'rejected', 'no_response'],
   confirmed: ['interview', 'offer', 'rejected', 'no_response'],
   // Nach dem Gespräch kann ein zweites folgen.

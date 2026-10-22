@@ -14,9 +14,10 @@ export default function NeueBewerbungScreen() {
   return (
     <ApplicationForm
       defaultValues={defaults}
+      chooseStage
       submitLabel="Bewerbung speichern"
       onSubmit={async (values) => {
-        await createApplication(db, toNewApplication(values));
+        await createApplication(db, toNewApplication(values), values.stage);
         router.back();
       }}
     />

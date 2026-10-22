@@ -40,6 +40,7 @@ type Props = {
 };
 
 const NOTE_PLACEHOLDER: Partial<Record<Status, string>> = {
+  applied: 'z. B. Lebenslauf und Zeugnisse per E-Mail an Frau Berger',
   interview: 'z. B. Adresse, Ansprechperson, Link zum Videocall',
   rejected: 'z. B. Absage per E-Mail, Begründung',
   offer: 'z. B. Start zum 1. Dezember',
@@ -157,8 +158,17 @@ export function StatusChanger({ current, floorDate, upcomingInterview, onSave }:
   const chipLabel = (status: Status) =>
     status === 'interview' && current === 'interview' ? 'Weiteres Gespräch' : STATUS_LABELS[status];
 
+  const dateLabel =
+    selected === 'applied' ? 'Wann abgeschickt?' : isInterview ? 'Wann?' : 'Seit wann?';
+
   return (
     <View style={styles.wrap}>
+      {current === 'saved' && (
+        <Text style={[styles.hint, { color: theme.muted }]}>
+          Sobald du die Unterlagen abgeschickt hast, setz die Stelle auf „Beworben“. Erst dann
+          zählt sie als Bewerbung und steht im Nachweis.
+        </Text>
+      )}
       <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Neuer Status">
         {options.map((status) => {
           const active = status === selected;
@@ -191,7 +201,7 @@ export function StatusChanger({ current, floorDate, upcomingInterview, onSave }:
 
       {selected && (
         <View style={[styles.panel, { backgroundColor: theme.surface, borderColor: theme.line }]}>
-          <Field label={isInterview ? 'Wann?' : 'Seit wann?'} error={error ?? undefined}>
+          <Field label={dateLabel} error={error ?? undefined}>
             <DateField
               value={date}
               onChange={(iso) => {
@@ -291,6 +301,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: type.body,
+  hint: { ...type.small, lineHeight: 19 },
   panel: {
     padding: space.lg,
     gap: space.lg,

@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { toIsoDate } from '@/lib/dates';
 import {
   CHANNELS,
+  isSaved,
   SOURCES,
+  STAGES,
   type Application,
   type NewApplication,
 } from '@/types/application';
@@ -13,6 +15,8 @@ const optionalText = (max: number) =>
   z.string().trim().max(max, `Höchstens ${max} Zeichen`);
 
 export const applicationFormSchema = z.object({
+  /** Nur beim Anlegen wählbar; danach ändert sich das über den Verlauf. */
+  stage: z.enum(STAGES),
   company: z
     .string()
     .trim()
@@ -44,6 +48,7 @@ export type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
 
 export function emptyFormValues(): ApplicationFormValues {
   return {
+    stage: 'applied',
     company: '',
     position: '',
     appliedAt: toIsoDate(new Date()),
@@ -60,6 +65,7 @@ export function emptyFormValues(): ApplicationFormValues {
 /** Bestehende Bewerbung → Formularwerte (zum Bearbeiten). */
 export function toFormValues(app: Application): ApplicationFormValues {
   return {
+    stage: isSaved(app.status) ? 'saved' : 'applied',
     company: app.company,
     position: app.position,
     appliedAt: app.appliedAt,

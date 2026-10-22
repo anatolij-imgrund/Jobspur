@@ -40,7 +40,8 @@ async function sourceDevice() {
   await insertSampleData(a.db);
   await saveProfile(a.db, { ...EMPTY_PROFILE, name: 'Anatolij Imgrund', city: 'Köln' });
   await R.createRecipient(a.db, { kind: 'jobcenter', name: 'Jobcenter Köln', customerNumber: '123D456', bgNumber: '999', contactPerson: null, street: null, zip: null, city: null });
-  const [first] = await A.listApplications(a.db);
+  // Eine abgeschickte Bewerbung; vorgemerkte bekommen keinen Termin.
+  const first = (await A.listApplications(a.db)).find((x) => x.status !== 'saved')!;
   const { eventId } = await A.addStatusEvent(a.db, first.id, { status: 'interview', date: '2099-01-05', note: 'Sonderzeichen "<>&ü', time: '10:00', mode: 'video' });
   await A.setReminderIds(a.db, eventId, ['geraet-a-1']);
   await setLastBackupAt(a.db, '2026-10-21');
@@ -139,7 +140,7 @@ describe('Sicherung erstellen und wiederherstellen', () => {
 
   test('Beschreibung, Dateiname und Ordnername', async () => {
     const backup = await buildBackup((await sourceDevice()).db, new Date(2026, 9, 21, 12));
-    assert.equal(describeBackup(backup), 'Sicherung vom 21.10.2026: 5 Bewerbungen, 1 Stelle.');
+    assert.equal(describeBackup(backup), 'Sicherung vom 21.10.2026: 5 Bewerbungen, 1 Vormerkung, 1 Stelle.');
     assert.equal(backupFileName(new Date(2026, 9, 21)), 'Jobspur_Sicherung_2026-10-21.json');
     assert.equal(folderLabel('content://x/tree/primary%3ADownload'), 'Download');
     assert.equal(folderLabel('content://x/tree/primary%3ADocuments%2FBewerbungen'), 'Documents/Bewerbungen');
@@ -166,10 +167,13 @@ describe('Präparierte oder kaputte Sicherungsdateien', () => {
 
   test('unlogischer Verlauf mit konkreter Meldung', () => {
     assertRejected(file({ applications: [app(), app()] }), 'Bewerbung 1 kommt doppelt vor');
-    assertRejected(file({ statusEvents: [ev({ status: 'offer' })] }), 'beginnt nicht mit „Beworben“');
+    assertRejected(file({ statusEvents: [ev({ status: 'offer' })] }), 'beginnt nicht mit „Beworben“ oder „Vorgemerkt“');
     assertRejected(file({ statusEvents: [ev(), ev({ id: 2, application_id: 99 })] }), 'gehört zu keiner Bewerbung');
     assertRejected(file({ statusEvents: [ev(), ev({ id: 2, date: '2026-09-01' })] }), 'liegt vor der Bewerbung');
     assertRejected(file({ statusEvents: [] }), 'hat keinen Verlauf');
+    assertRejected(file({ statusEvents: [ev({ status: 'saved' }), ev({ id: 2, status: 'confirmed' })] }), 'ist aber nur vorgemerkt');
+    assertRejected(file({ statusEvents: [ev(), ev({ id: 2, status: 'saved' })] }), 'steht nicht am Anfang');
+    assertRejected(file({ statusEvents: [ev({ status: 'saved' }), ev({ id: 2 }), ev({ id: 3 })] }), 'mehrfach „Beworben“');
   });
 
   test('SQL im Firmennamen landet nur als Text in der Datenbank', async () => {

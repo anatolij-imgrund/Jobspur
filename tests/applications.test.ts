@@ -99,7 +99,7 @@ describe('Bewerbungen und Verlauf', () => {
     await insertSampleData(db);
     for (const app of await A.listApplications(db)) {
       const events = await A.listStatusEvents(db, app.id);
-      assert.equal(events.at(-1)?.status, 'applied', `${app.company} beginnt mit „Beworben“`);
+      assert.ok(['applied', 'saved'].includes(events.at(-1)!.status), `${app.company} beginnt mit „Beworben“ oder „Vorgemerkt“`);
       assert.equal(events[0].status, app.status, `${app.company}: Status passt zum Verlauf`);
     }
   });
@@ -110,9 +110,11 @@ describe('Statusübergänge', () => {
     for (const s of STATUSES) assert.equal(isFinal(s), NEXT_STATUSES[s].length === 0, s);
   });
 
-  test('kein Weg zurück zu „Beworben“, nur Gespräch darf sich wiederholen', () => {
+  test('„Beworben“ nur nach „Vorgemerkt“, nur Gespräch darf sich wiederholen', () => {
+    assert.deepEqual(NEXT_STATUSES.saved, ['applied']);
     for (const s of STATUSES) {
-      assert.ok(!NEXT_STATUSES[s].includes('applied'), s);
+      if (s !== 'saved') assert.ok(!NEXT_STATUSES[s].includes('applied'), s);
+      assert.ok(!NEXT_STATUSES[s].includes('saved'), `zurück zu „Vorgemerkt“ nach ${s}`);
       if (s !== 'interview') assert.ok(!NEXT_STATUSES[s].includes(s), s);
     }
     assert.ok(NEXT_STATUSES.interview.includes('interview'), 'Zweitgespräch');

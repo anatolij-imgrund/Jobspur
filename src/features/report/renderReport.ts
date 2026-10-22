@@ -43,7 +43,7 @@ function eventText(e: StatusEvent, createdAt: string): string {
 
 /** Alle Rückmeldungen nach „Beworben“, z. B. „Gespräch 12.10., Absage 20.10.“ */
 function responseText(events: StatusEvent[], createdAt: string): string {
-  const replies = events.filter((e) => e.status !== 'applied');
+  const replies = events.filter((e) => e.status !== 'applied' && e.status !== 'saved');
   if (replies.length === 0) return '<span class="muted">noch offen</span>';
   return replies.map((e) => eventText(e, createdAt)).join('<br>');
 }

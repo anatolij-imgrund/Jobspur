@@ -140,18 +140,28 @@ const backupSchema = z
 
     // Der Verlauf muss zur Bewerbung passen: gleiche Regeln wie in der App.
     const apps = new Map(b.applications.map((a) => [a.id, a]));
-    const firstEvent = new Map<number, (typeof b.statusEvents)[number]>();
+    const byApp = new Map<number, (typeof b.statusEvents)[number][]>();
     for (const e of b.statusEvents) {
-      const a = apps.get(e.application_id);
-      if (!a) return issue(`Verlaufseintrag ${e.id} gehört zu keiner Bewerbung`);
-      if (e.date < a.applied_at) return issue(`Verlaufseintrag ${e.id} liegt vor der Bewerbung`);
-      const first = firstEvent.get(a.id);
-      if (!first || e.id < first.id) firstEvent.set(a.id, e);
+      if (!apps.has(e.application_id)) return issue(`Verlaufseintrag ${e.id} gehört zu keiner Bewerbung`);
+      byApp.set(e.application_id, [...(byApp.get(e.application_id) ?? []), e]);
     }
     for (const a of b.applications) {
-      const first = firstEvent.get(a.id);
+      const events = (byApp.get(a.id) ?? []).sort((x, y) => x.id - y.id);
+      const [first, ...rest] = events;
       if (!first) return issue(`Bewerbung ${a.id} hat keinen Verlauf`);
-      if (first.status !== 'applied') return issue(`Verlauf von Bewerbung ${a.id} beginnt nicht mit „Beworben“`);
+      if (first.status !== 'applied' && first.status !== 'saved') {
+        return issue(`Verlauf von Bewerbung ${a.id} beginnt nicht mit „Beworben“ oder „Vorgemerkt“`);
+      }
+      for (const e of rest) {
+        if (e.date < first.date) return issue(`Verlaufseintrag ${e.id} liegt vor der Bewerbung`);
+        if (e.status === 'saved') return issue(`„Vorgemerkt“ steht nicht am Anfang von Bewerbung ${a.id}`);
+      }
+      // „Beworben“ gibt es genau einmal, nach „Vorgemerkt“ höchstens einmal.
+      const applied = events.filter((e) => e.status === 'applied');
+      if (applied.length > 1) return issue(`Bewerbung ${a.id} ist mehrfach „Beworben“`);
+      if (first.status === 'saved' && applied.length === 0 && rest.length > 0) {
+        return issue(`Bewerbung ${a.id} hat Rückmeldungen, ist aber nur vorgemerkt`);
+      }
     }
   });
 
@@ -237,11 +247,12 @@ export function describeBackup(b: Backup): string {
   const when = Number.isNaN(date.getTime())
     ? ''
     : ` vom ${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
-  const n = b.applications.length;
+  const saved = b.applications.filter((a) => a.status === 'saved').length;
+  const n = b.applications.length - saved;
   const s = b.recipients.length;
   return `Sicherung${when}: ${n} ${n === 1 ? 'Bewerbung' : 'Bewerbungen'}${
-    s ? `, ${s} ${s === 1 ? 'Stelle' : 'Stellen'}` : ''
-  }.`;
+    saved ? `, ${saved} ${saved === 1 ? 'Vormerkung' : 'Vormerkungen'}` : ''
+  }${s ? `, ${s} ${s === 1 ? 'Stelle' : 'Stellen'}` : ''}.`;
 }
 
 // ── Wiederherstellen ────────────────────────────────────────────────
@@ -306,13 +317,21 @@ export async function restoreBackup(db: SQLiteDatabase, b: Backup): Promise<stri
     }
 
     // Den aktuellen Status nicht aus der Datei glauben, sondern wie in der
-    // App aus dem Verlauf ableiten: jüngster Eintrag gewinnt.
+    // App aus dem Verlauf ableiten: jüngster Eintrag gewinnt. Das Datum ist
+    // das von „Beworben“, bei nur vorgemerkten Stellen das des ersten Eintrags.
     await db.execAsync(`
-      UPDATE applications SET status = (
-        SELECT e.status FROM status_events e
-        WHERE e.application_id = applications.id
-        ORDER BY e.date DESC, e.id DESC LIMIT 1
-      );
+      UPDATE applications SET
+        status = (
+          SELECT e.status FROM status_events e
+          WHERE e.application_id = applications.id
+          ORDER BY e.date DESC, e.id DESC LIMIT 1
+        ),
+        applied_at = COALESCE(
+          (SELECT e.date FROM status_events e
+           WHERE e.application_id = applications.id AND e.status = 'applied'),
+          (SELECT e.date FROM status_events e
+           WHERE e.application_id = applications.id ORDER BY e.id LIMIT 1)
+        );
     `);
   });
 

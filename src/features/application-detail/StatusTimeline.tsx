@@ -9,13 +9,13 @@ import { INTERVIEW_MODE_LABELS, STATUS_LABELS, type StatusEvent } from '@/types/
 type Props = {
   /** Neuester Eintrag zuerst. */
   events: StatusEvent[];
-  /** Dieser Eintrag („Beworben“) lässt sich nicht entfernen. */
-  firstEventId: number | null;
+  /** Ob sich ein Eintrag entfernen lässt (siehe isRemovable). */
+  canRemove: (event: StatusEvent) => boolean;
   onDelete: (event: StatusEvent) => void;
 };
 
 /** Senkrechter Verlauf: Punkt, Status, Datum, Notiz. Der oberste ist der aktuelle. */
-export function StatusTimeline({ events, firstEventId, onDelete }: Props) {
+export function StatusTimeline({ events, canRemove, onDelete }: Props) {
   const theme = useTheme();
 
   const now = useNow();
@@ -41,7 +41,7 @@ export function StatusTimeline({ events, firstEventId, onDelete }: Props) {
         const current = index === 0;
         const last = index === events.length - 1;
         const colors = theme.status[event.status];
-        const removable = event.id !== firstEventId;
+        const removable = canRemove(event);
         const planned = isPlanned(event);
         const details = [
           event.time && `${event.time} Uhr`,

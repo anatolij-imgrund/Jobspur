@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatDate, formatWeekdayDate } from '@/lib/dates';
 import { space, type, useTheme } from '@/theme';
-import { CHANNEL_LABELS, type Application } from '@/types/application';
+import { CHANNEL_LABELS, type Application, isSaved } from '@/types/application';
 
 import { StatusBadge } from './StatusBadge';
 
@@ -17,7 +17,9 @@ export function ApplicationRow({ application }: Props) {
   const dimmed = application.status === 'rejected';
   const ink = dimmed ? theme.muted : theme.ink;
   const meta = [
-    formatDate(application.appliedAt),
+    isSaved(application.status)
+      ? `vorgemerkt ${formatDate(application.appliedAt)}`
+      : formatDate(application.appliedAt),
     CHANNEL_LABELS[application.channel],
     application.location,
     application.source === 'referral' ? 'Vermittlungsvorschlag' : null,

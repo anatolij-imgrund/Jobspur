@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import type { Application, StatusEvent } from '@/types/application';
+import { type Application, isSaved, type StatusEvent } from '@/types/application';
 
 import { listApplications, listStatusEvents } from './applications';
 
@@ -35,14 +35,17 @@ export async function getReportData(
   from: string,
   to: string,
 ): Promise<ReportData> {
-  const all = await listApplications(db);
+  // Nur Vorgemerktes ist noch keine Bewerbung und gehört nicht in den Nachweis.
+  const all = (await listApplications(db)).filter((a) => !isSaved(a.status));
   const inRange = all
     .filter((a) => a.appliedAt >= from && a.appliedAt <= to)
     .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt) || a.id - b.id);
 
   const entries: ReportEntry[] = [];
   for (const application of inRange) {
-    const events = (await listStatusEvents(db, application.id)).reverse();
+    const events = (await listStatusEvents(db, application.id))
+      .filter((e) => !isSaved(e.status))
+      .reverse();
     entries.push({ application, events });
   }
 
@@ -51,7 +54,8 @@ export async function getReportData(
   for (const application of earlier) {
     const events = await listStatusEvents(db, application.id);
     for (const event of events) {
-      if (event.status !== 'applied' && event.date >= from && event.date <= to) {
+      const reply = event.status !== 'applied' && !isSaved(event.status);
+      if (reply && event.date >= from && event.date <= to) {
         followUps.push({ application, event });
       }
     }

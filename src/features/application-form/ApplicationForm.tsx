@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRef } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import type { TextInput } from 'react-native';
 
 import { ChoiceGroup } from '@/components/form/ChoiceGroup';
@@ -10,12 +10,26 @@ import { FormGroupTitle, FormLayout } from '@/components/form/FormLayout';
 import { TextField } from '@/components/form/TextField';
 import { useDiscardGuard } from '@/hooks/useDiscardGuard';
 import { formatDate } from '@/lib/dates';
-import { CHANNEL_LABELS, CHANNELS, SOURCE_LABELS, SOURCES } from '@/types/application';
+import {
+  CHANNEL_LABELS,
+  CHANNELS,
+  SOURCE_LABELS,
+  SOURCES,
+  type Stage,
+  STAGES,
+} from '@/types/application';
 
 import { applicationFormSchema, type ApplicationFormValues } from './schema';
 
+const STAGE_LABELS: Record<Stage, string> = {
+  applied: 'Ja, beworben',
+  saved: 'Nein, erst vormerken',
+};
+
 type Props = {
   defaultValues: ApplicationFormValues;
+  /** Beim Anlegen: Frage „Schon abgeschickt?“ zeigen */
+  chooseStage?: boolean;
   submitLabel: string;
   onSubmit: (values: ApplicationFormValues) => Promise<void>;
   /**
@@ -31,6 +45,7 @@ type Props = {
  */
 export function ApplicationForm({
   defaultValues,
+  chooseStage = false,
   submitLabel,
   onSubmit,
   latestAppliedAt,
@@ -51,6 +66,8 @@ export function ApplicationForm({
     defaultValues,
     mode: 'onTouched',
   });
+
+  const saved = useWatch({ control, name: 'stage' }) === 'saved';
 
   // Nach erfolgreichem Speichern darf die Seite ohne Rückfrage schließen.
   useDiscardGuard(
@@ -80,11 +97,36 @@ export function ApplicationForm({
 
   return (
     <FormLayout
-      submitLabel={submitLabel}
+      submitLabel={chooseStage && saved ? 'Stelle vormerken' : submitLabel}
       onSubmit={submit}
       submitting={isSubmitting}
       error={errors.root?.save?.message}
     >
+      {chooseStage && (
+        <Field
+          label="Schon abgeschickt?"
+          hint={
+            saved
+              ? 'Die Stelle zählt erst als Bewerbung, wenn du sie später auf „Beworben“ setzt. Bis dahin steht sie nicht im Nachweis.'
+              : undefined
+          }
+        >
+          <Controller
+            control={control}
+            name="stage"
+            render={({ field }) => (
+              <ChoiceGroup
+                options={STAGES}
+                labels={STAGE_LABELS}
+                value={field.value}
+                onChange={field.onChange}
+                accessibilityLabel="Schon abgeschickt?"
+              />
+            )}
+          />
+        </Field>
+      )}
+
       <Field label="Firma" error={errors.company?.message}>
         <Controller
           control={control}
@@ -128,22 +170,28 @@ export function ApplicationForm({
         />
       </Field>
 
-      <Field label="Beworben am" error={errors.appliedAt?.message}>
-        <Controller
-          control={control}
-          name="appliedAt"
-          render={({ field }) => (
-            <DateField
-              value={field.value}
-              onChange={field.onChange}
-              invalid={!!errors.appliedAt}
-              accessibilityLabel="Beworben am"
-            />
-          )}
-        />
-      </Field>
+      {/* Beim Vormerken ist das Datum einfach heute; nur beim Bearbeiten wählbar. */}
+      {!(chooseStage && saved) && (
+        <Field label={saved ? 'Vorgemerkt am' : 'Beworben am'} error={errors.appliedAt?.message}>
+          <Controller
+            control={control}
+            name="appliedAt"
+            render={({ field }) => (
+              <DateField
+                value={field.value}
+                onChange={field.onChange}
+                invalid={!!errors.appliedAt}
+                accessibilityLabel={saved ? 'Vorgemerkt am' : 'Beworben am'}
+              />
+            )}
+          />
+        </Field>
+      )}
 
-      <Field label="Bewerbungsweg" error={errors.channel?.message}>
+      <Field
+        label={saved ? 'Wie willst du dich bewerben?' : 'Bewerbungsweg'}
+        error={errors.channel?.message}
+      >
         <Controller
           control={control}
           name="channel"

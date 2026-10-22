@@ -19,14 +19,22 @@ import { UpcomingInterviews } from '@/features/overview/UpcomingInterviews';
 import { background } from '@/lib/background';
 import { formatMonthKey, monthKey, toIsoDate } from '@/lib/dates';
 import { radius, space, type, useTheme } from '@/theme';
-import type { Application, Status } from '@/types/application';
+import { type Application, isSaved, type Status } from '@/types/application';
 
 type Section = { key: string; title: string; data: Application[] };
 
-/** Gruppiert die (bereits sortierte) Liste nach Monat. */
+/**
+ * Gruppiert die (bereits sortierte) Liste nach Monat. Vorgemerkte Stellen
+ * stehen obenan: Die warten darauf, dass man sich bewirbt.
+ */
 function groupByMonth(items: Application[]): Section[] {
   const sections: Section[] = [];
+  const saved = items.filter((a) => isSaved(a.status));
+  if (saved.length > 0) {
+    sections.push({ key: 'saved', title: 'Vorgemerkt, noch nicht abgeschickt', data: saved });
+  }
   for (const item of items) {
+    if (isSaved(item.status)) continue;
     const key = monthKey(item.appliedAt);
     const last = sections.at(-1);
     if (last?.key === key) {
@@ -124,8 +132,9 @@ export default function OverviewScreen() {
                 Noch keine Bewerbungen eingetragen
               </Text>
               <Text style={[styles.emptyText, { color: theme.muted }]}>
-                Trag jede Bewerbung direkt nach dem Abschicken ein. Vor dem Termin bei der
-                Agentur oder dem Jobcenter erstellst du daraus den Nachweis.
+                Trag jede Bewerbung direkt nach dem Abschicken ein oder merk dir Stellen vor, bei
+                denen du dich noch bewerben willst. Vor dem Termin bei der Agentur oder dem
+                Jobcenter erstellst du daraus den Nachweis.
               </Text>
               <Pressable
                 onPress={() => router.push('/bewerbung/neu')}

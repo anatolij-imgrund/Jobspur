@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { toIsoDate } from '@/lib/dates';
-import type { NewApplication, NewStatusEvent } from '@/types/application';
+import type { NewApplication, NewStatusEvent, Stage } from '@/types/application';
 
 import { addStatusEvent, createApplication } from './applications';
 
@@ -11,7 +11,7 @@ function daysAgo(n: number): string {
   return toIsoDate(d);
 }
 
-type Sample = NewApplication & { history?: NewStatusEvent[] };
+type Sample = NewApplication & { stage?: Stage; history?: NewStatusEvent[] };
 
 const base = {
   contactName: null,
@@ -22,11 +22,23 @@ const base = {
 
 /**
  * Nur für die Entwicklung: füllt die Liste mit erfundenen Beispielen.
- * Der Verlauf entsteht wie in der echten App: erst „Beworben“, dann
- * jede Rückmeldung als eigener Eintrag.
+ * Der Verlauf entsteht wie in der echten App: erst „Beworben“ oder
+ * „Vorgemerkt“, dann jede Rückmeldung als eigener Eintrag.
  */
 export async function insertSampleData(db: SQLiteDatabase): Promise<void> {
   const samples: Sample[] = [
+    {
+      ...base,
+      company: 'Rheinblick Versicherung',
+      position: 'Junior Softwareentwickler Java',
+      appliedAt: daysAgo(0),
+      channel: 'email',
+      source: 'own',
+      location: 'Düsseldorf',
+      contactName: 'Herr Yilmaz',
+      notes: 'Auf der Jobmesse am Stand gesprochen. Lebenslauf und Zeugnisse per E-Mail.',
+      stage: 'saved',
+    },
     {
       ...base,
       company: 'Nordlicht Software GmbH',
@@ -82,8 +94,8 @@ export async function insertSampleData(db: SQLiteDatabase): Promise<void> {
     },
   ];
 
-  for (const { history = [], ...application } of samples) {
-    const id = await createApplication(db, application);
+  for (const { history = [], stage, ...application } of samples) {
+    const id = await createApplication(db, application, stage);
     for (const event of history) {
       await addStatusEvent(db, id, event);
     }

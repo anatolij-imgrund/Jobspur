@@ -49,6 +49,8 @@ diesen Nachweis. Jobspur ist für die Jobsuche in Deutschland gebaut.
 **Bewerbungen und Verlauf**
 - Bewerbung in Sekunden eintragen: Firma, Stelle, Datum, Bewerbungsweg und ob
   es ein Vermittlungsvorschlag war
+- Stellen vormerken, z. B. von der Jobmesse: Sie zählen erst als Bewerbung,
+  wenn die Unterlagen raus sind, und stehen bis dahin nicht im Nachweis
 - Jede Rückmeldung als Eintrag im Verlauf: Eingang bestätigt, Gespräch,
   Zusage, Absage, keine Antwort
 - Nur sinnvolle Übergänge; nach Absage oder Zusage ist die Bewerbung abgeschlossen

@@ -7,9 +7,19 @@ import type {
   NewApplication,
   NewStatusEvent,
   Source,
+  Stage,
   Status,
   StatusEvent,
 } from '@/types/application';
+
+/**
+ * Der Eintrag, der das Bewerbungsdatum (applied_at) festlegt: „Beworben“,
+ * oder solange die Stelle nur vorgemerkt ist, der erste Eintrag.
+ * Als SQL-Ausdruck für eine Bewerbung mit der Id im Parameter.
+ */
+const ANCHOR_EVENT_ID = `COALESCE(
+  (SELECT MIN(id) FROM status_events WHERE application_id = ? AND status = 'applied'),
+  (SELECT MIN(id) FROM status_events WHERE application_id = ?))`;
 
 /** So liegt eine Zeile in der Datenbank (snake_case). */
 type ApplicationRow = {
@@ -117,15 +127,17 @@ export async function getApplication(
 }
 
 /**
- * Legt eine Bewerbung an und schreibt „Beworben“ als ersten Eintrag in den
- * Verlauf. Dieser Eintrag lässt sich später nicht löschen; deshalb ist er
- * immer „Beworben“ und nie ein anderer Status.
+ * Legt eine Bewerbung an und schreibt den ersten Eintrag in den Verlauf:
+ * „Beworben“ oder „Vorgemerkt“, wenn die Unterlagen noch nicht raus sind.
+ * Dieser Eintrag lässt sich später nicht löschen; deshalb ist er nie ein
+ * anderer Status.
  */
 export async function createApplication(
   db: SQLiteDatabase,
   input: NewApplication,
+  stage: Stage = 'applied',
 ): Promise<number> {
-  const status: Status = 'applied';
+  const status: Status = stage;
   let id = 0;
 
   await db.withTransactionAsync(async () => {
@@ -161,7 +173,9 @@ export async function createApplication(
 
 /**
  * Ändert die Angaben einer Bewerbung. Verschiebt sich das Bewerbungsdatum,
- * wandert der erste Eintrag im Verlauf mit.
+ * wandert „Beworben“ im Verlauf mit (bei vorgemerkten Stellen der erste
+ * Eintrag). „Vorgemerkt“ kann nicht nach „Beworben“ liegen und rückt
+ * notfalls mit nach vorn.
  */
 export async function updateApplication(
   db: SQLiteDatabase,
@@ -188,10 +202,17 @@ export async function updateApplication(
       id,
     );
     await db.runAsync(
-      `UPDATE status_events SET date = ?
-       WHERE id = (SELECT MIN(id) FROM status_events WHERE application_id = ?)`,
+      `UPDATE status_events SET date = ? WHERE id = ${ANCHOR_EVENT_ID}`,
       input.appliedAt,
       id,
+      id,
+    );
+    await db.runAsync(
+      `UPDATE status_events SET date = ?
+       WHERE application_id = ? AND status = 'saved' AND date > ?`,
+      input.appliedAt,
+      id,
+      input.appliedAt,
     );
     await syncCurrentStatus(db, id);
   });
@@ -270,8 +291,10 @@ export async function listStatusEvents(
 }
 
 /**
- * Setzt den aktuellen Status auf den jüngsten Eintrag im Verlauf.
- * Bei gleichem Datum gewinnt der später eingetragene.
+ * Leitet Status und Bewerbungsdatum aus dem Verlauf ab: Der Status ist der
+ * jüngste Eintrag (bei gleichem Datum der später eingetragene), das Datum
+ * das von „Beworben“ oder, solange die Stelle nur vorgemerkt ist, das des
+ * ersten Eintrags.
  */
 async function syncCurrentStatus(db: SQLiteDatabase, applicationId: number): Promise<void> {
   await db.runAsync(
@@ -280,8 +303,13 @@ async function syncCurrentStatus(db: SQLiteDatabase, applicationId: number): Pro
          (SELECT status FROM status_events WHERE application_id = ?
           ORDER BY date DESC, id DESC LIMIT 1),
          'applied'),
+       applied_at = COALESCE(
+         (SELECT date FROM status_events WHERE id = ${ANCHOR_EVENT_ID}),
+         applied_at),
        updated_at = datetime('now')
      WHERE id = ?`,
+    applicationId,
+    applicationId,
     applicationId,
     applicationId,
   );
@@ -347,9 +375,22 @@ export async function setReminderIds(
 }
 
 /**
- * Entfernt einen Eintrag aus dem Verlauf. Der erste Eintrag
- * („Beworben“) gehört zur Bewerbung selbst und bleibt stehen.
+ * Ob sich ein Eintrag entfernen lässt. Der erste Eintrag gehört zur
+ * Bewerbung selbst und bleibt stehen. „Beworben“ nach „Vorgemerkt“ lässt
+ * sich nur zurücknehmen, solange danach nichts kam, sonst stünden
+ * Rückmeldungen ohne Bewerbung im Verlauf.
  */
+export function isRemovable(
+  event: StatusEvent,
+  events: readonly StatusEvent[],
+  firstEventId: number | null,
+): boolean {
+  if (event.id === firstEventId) return false;
+  if (event.status === 'applied') return !events.some((e) => e.status !== 'saved' && e.status !== 'applied');
+  return true;
+}
+
+/** Entfernt einen Eintrag aus dem Verlauf, wenn isRemovable es erlaubt. */
 export async function deleteStatusEvent(
   db: SQLiteDatabase,
   applicationId: number,
@@ -360,8 +401,12 @@ export async function deleteStatusEvent(
     await db.runAsync(
       `DELETE FROM status_events
        WHERE id = ? AND application_id = ?
-         AND id <> (SELECT MIN(id) FROM status_events WHERE application_id = ?)`,
+         AND id <> (SELECT MIN(id) FROM status_events WHERE application_id = ?)
+         AND NOT (status = 'applied' AND EXISTS (
+           SELECT 1 FROM status_events
+           WHERE application_id = ? AND status NOT IN ('saved', 'applied')))`,
       eventId,
+      applicationId,
       applicationId,
       applicationId,
     );
@@ -371,7 +416,7 @@ export async function deleteStatusEvent(
 }
 
 /**
- * Frühestes Datum eines späteren Verlaufseintrags (ohne „Beworben“).
+ * Frühestes Datum einer Rückmeldung (also ohne „Beworben“ und „Vorgemerkt“).
  * Das Bewerbungsdatum darf nicht danach liegen.
  */
 export async function getEarliestFollowUpDate(
@@ -380,9 +425,7 @@ export async function getEarliestFollowUpDate(
 ): Promise<string | null> {
   const row = await db.getFirstAsync<{ d: string | null }>(
     `SELECT MIN(date) AS d FROM status_events
-     WHERE application_id = ?
-       AND id <> (SELECT MIN(id) FROM status_events WHERE application_id = ?)`,
-    applicationId,
+     WHERE application_id = ? AND status NOT IN ('saved', 'applied')`,
     applicationId,
   );
   return row?.d ?? null;
@@ -400,7 +443,7 @@ export async function getFirstStatusEventId(
   return row?.id ?? null;
 }
 
-/** ISO-Daten (YYYY-MM-DD) aller Bewerbungen im angegebenen Monat. */
+/** ISO-Daten (YYYY-MM-DD) aller abgeschickten Bewerbungen im angegebenen Monat. */
 export async function getApplicationDatesInMonth(
   db: SQLiteDatabase,
   year: number,
@@ -408,7 +451,7 @@ export async function getApplicationDatesInMonth(
 ): Promise<string[]> {
   const prefix = `${year}-${String(month).padStart(2, '0')}-%`;
   const rows = await db.getAllAsync<{ applied_at: string }>(
-    'SELECT applied_at FROM applications WHERE applied_at LIKE ?',
+    `SELECT applied_at FROM applications WHERE applied_at LIKE ? AND status <> 'saved'`,
     prefix,
   );
   return rows.map((r) => r.applied_at);

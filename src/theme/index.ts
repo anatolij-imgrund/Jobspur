@@ -18,6 +18,7 @@ const light = {
   accentSoft: '#E1EEE9',
   danger: '#A23B30',
   status: {
+    saved: { fg: '#5F6F6A', bg: '#ECEFEE' },
     applied: { fg: '#3E5468', bg: '#E6ECF1' },
     confirmed: { fg: '#3E5468', bg: '#E6ECF1' },
     interview: { fg: '#8A5A12', bg: '#F6EBD7' },
@@ -38,6 +39,7 @@ const dark: typeof light = {
   accentSoft: '#1E3530',
   danger: '#E8988D',
   status: {
+    saved: { fg: '#A7B5B0', bg: '#232C29' },
     applied: { fg: '#A9BFD2', bg: '#223039' },
     confirmed: { fg: '#A9BFD2', bg: '#223039' },
     interview: { fg: '#E5BE7A', bg: '#3A2E1B' },

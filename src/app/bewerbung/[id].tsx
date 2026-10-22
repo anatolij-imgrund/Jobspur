@@ -11,6 +11,7 @@ import {
   deleteStatusEvent,
   getApplication,
   getFirstStatusEventId,
+  isRemovable,
   listStatusEvents,
   setReminderIds,
 } from '@/db/applications';
@@ -26,6 +27,7 @@ import {
   CHANNEL_LABELS,
   INTERVIEW_MODE_LABELS,
   isFinal,
+  isSaved,
   SOURCE_LABELS,
   type StatusEvent,
 } from '@/types/application';
@@ -87,6 +89,7 @@ export default function BewerbungDetailScreen() {
   const lastEvent = events[0];
   // Nur „Beworben“ heißt wirklich: noch gar keine Rückmeldung.
   const waiting = app.status === 'applied';
+  const saved = isSaved(app.status);
 
   const today = toIsoDate(new Date());
   // Einträge sind neueste zuerst sortiert.
@@ -104,13 +107,17 @@ export default function BewerbungDetailScreen() {
       ].filter(Boolean);
       return `am ${parts.join(', ')}`;
     }
+    if (saved) return 'noch nicht abgeschickt';
     if (waiting && days >= 14) return `seit ${days} Tagen ohne Antwort`;
     return `${isFinal(app.status) ? 'am' : 'seit'} ${formatDate(lastEvent.date)}`;
   })();
 
   const facts: Fact[] = [
-    { label: 'Beworben am', value: `${formatDate(app.appliedAt)}, ${formatDaysAgo(days)}` },
-    { label: 'Weg', value: CHANNEL_LABELS[app.channel] },
+    {
+      label: saved ? 'Vorgemerkt am' : 'Beworben am',
+      value: `${formatDate(app.appliedAt)}, ${formatDaysAgo(days)}`,
+    },
+    { label: saved ? 'Geplanter Weg' : 'Weg', value: CHANNEL_LABELS[app.channel] },
     { label: 'Gefunden über', value: SOURCE_LABELS[app.source] },
   ];
   if (app.location) facts.push({ label: 'Ort', value: app.location });
@@ -196,7 +203,7 @@ export default function BewerbungDetailScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.ink }]}>
-            {isFinal(app.status) ? 'Status' : 'Status ändern'}
+            {isFinal(app.status) ? 'Status' : saved ? 'Abgeschickt?' : 'Status ändern'}
           </Text>
           <StatusChanger
             current={app.status}
@@ -238,7 +245,7 @@ export default function BewerbungDetailScreen() {
           <Text style={[styles.sectionTitle, { color: theme.ink }]}>Verlauf</Text>
           <StatusTimeline
             events={events}
-            firstEventId={firstEventId}
+            canRemove={(event) => isRemovable(event, events, firstEventId)}
             onDelete={async (event) => {
               const reminders = await deleteStatusEvent(db, id, event.id);
               await cancelReminders(reminders);
