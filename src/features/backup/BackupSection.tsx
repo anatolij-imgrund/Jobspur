@@ -3,6 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { removeOrphanPhotoFiles } from '@/features/photos/photoFiles';
 import { cancelReminders } from '@/features/reminders/reminders';
 import { rescheduleUpcomingReminders } from '@/features/reminders/reschedule';
 import { background } from '@/lib/background';
@@ -107,7 +108,7 @@ export function BackupSection({ onRestored }: { onRestored: () => void }) {
       const backup = parseBackup(text);
       const ok = await confirm(
         'Sicherung wiederherstellen?',
-        `${describeBackup(backup)}\n\nAlle Daten, die jetzt in der App sind, werden dabei ersetzt.`,
+        `${describeBackup(backup)}\n\nAlle Daten, die jetzt in der App sind, werden dabei ersetzt. Fotos sind nicht in der Sicherung und werden dabei gelöscht.`,
         'Wiederherstellen',
       );
       if (!ok) return;
@@ -115,6 +116,7 @@ export function BackupSection({ onRestored }: { onRestored: () => void }) {
       const oldReminders = await restoreBackup(db, backup);
       await cancelReminders(oldReminders);
       const rescheduled = await rescheduleUpcomingReminders(db);
+      background(removeOrphanPhotoFiles(db), 'Aufräumen der Fotos');
       onRestored();
 
       Alert.alert(
@@ -147,7 +149,7 @@ export function BackupSection({ onRestored }: { onRestored: () => void }) {
       <Text style={[styles.intro, { color: theme.muted }]}>
         Deine Daten liegen nur auf diesem Handy. Speichere ab und zu eine Sicherung, am besten
         zusätzlich außerhalb des Handys, z. B. in Google Drive. Dann sind deine Daten auch bei
-        einem neuen Handy da.
+        einem neuen Handy da. Fotos sind nicht in der Sicherung.
       </Text>
 
       <Text

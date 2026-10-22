@@ -280,6 +280,7 @@ export async function restoreBackup(db: SQLiteDatabase, b: Backup): Promise<stri
   await db.withTransactionAsync(async () => {
     await db.execAsync(`
       DELETE FROM status_events;
+      DELETE FROM photos;
       DELETE FROM applications;
       DELETE FROM recipients;
       DELETE FROM settings WHERE key NOT IN (${DEVICE_SETTINGS_SQL});

@@ -51,6 +51,7 @@ diesen Nachweis. Jobspur ist für die Jobsuche in Deutschland gebaut.
   es ein Vermittlungsvorschlag war
 - Stellen vormerken, z. B. von der Jobmesse: Sie zählen erst als Bewerbung,
   wenn die Unterlagen raus sind, und stehen bis dahin nicht im Nachweis
+- Fotos der Stellenanzeige anhängen, mit der Kamera oder aus der Galerie
 - Jede Rückmeldung als Eintrag im Verlauf: Eingang bestätigt, Gespräch,
   Zusage, Absage, keine Antwort
 - Nur sinnvolle Übergänge; nach Absage oder Zusage ist die Bewerbung abgeschlossen
@@ -86,11 +87,14 @@ diesen Nachweis. Jobspur ist für die Jobsuche in Deutschland gebaut.
 ## Datenschutz
 
 Alle Daten bleiben auf dem Handy. Jobspur hat **kein Konto, keinen Server,
-kein Tracking und keine Werbung**. Die einzige Berechtigung, die die App
-erfragt, ist die für Benachrichtigungen, und auch die nur, wenn man eine
-Erinnerung an ein Gespräch möchte.
+kein Tracking und keine Werbung**. Die App fragt nur nach zwei
+Berechtigungen, und zwar erst, wenn man die Funktion nutzt: Benachrichtigungen
+für die Erinnerung an ein Gespräch und die Kamera für Fotos von
+Stellenanzeigen. Fotos aus der Galerie wählt man über die Bildauswahl von
+Android, ohne Zugriff auf alle Bilder.
 
-Eine Sicherung verlässt das Handy nur, wenn man sie selbst teilt.
+Eine Sicherung verlässt das Handy nur, wenn man sie selbst teilt. Fotos
+sind nicht in der Sicherung, damit die Datei klein bleibt.
 
 ## Technik
 

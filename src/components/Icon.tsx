@@ -12,6 +12,8 @@ const ICONS = {
   add: { android: 'add', web: 'add', ios: 'plus' },
   search: { android: 'search', web: 'search', ios: 'magnifyingglass' },
   close: { android: 'close', web: 'close', ios: 'xmark' },
+  camera: { android: 'photo_camera', web: 'photo_camera', ios: 'camera' },
+  gallery: { android: 'photo_library', web: 'photo_library', ios: 'photo.on.rectangle' },
 } as const;
 
 export type IconName = keyof typeof ICONS;

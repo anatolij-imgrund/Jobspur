@@ -44,6 +44,14 @@
         }
       ],
       "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Jobspur nutzt deine Fotos, damit du Bilder von Stellenanzeigen an Bewerbungen hängen kannst.",
+          "cameraPermission": "Jobspur nutzt die Kamera, damit du Stellenanzeigen fotografieren kannst.",
+          "microphonePermission": false
+        }
+      ],
       "expo-sharing",
       [
         "expo-notifications",

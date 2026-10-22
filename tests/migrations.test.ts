@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import * as A from '@/db/applications';
+import * as P from '@/db/photos';
 import * as R from '@/db/recipients';
 import { LATEST_VERSION, migrateDbIfNeeded } from '@/db/schema';
 
@@ -30,7 +31,7 @@ describe('Migrationen', () => {
   test('Version 1 → aktuell behält vorhandene Bewerbungen', async () => {
     const { db, raw } = await makeDb();
     // Stand eines Handys mit Version 1 nachbauen
-    raw.exec(`DROP TABLE recipients; ${V1_STATUS_EVENTS} PRAGMA user_version = 1;`);
+    raw.exec(`DROP TABLE photos; DROP TABLE recipients; ${V1_STATUS_EVENTS} PRAGMA user_version = 1;`);
     raw.exec(`INSERT INTO applications (company, position, applied_at, channel) VALUES ('Alt', 'Dev', '2026-09-01', 'email');
               INSERT INTO status_events (application_id, status, date) VALUES (1, 'applied', '2026-09-01');`);
 
@@ -41,6 +42,18 @@ describe('Migrationen', () => {
     assert.deepEqual(await R.listRecipients(db), []);
     const [event] = await A.listStatusEvents(db, 1);
     assert.deepEqual([event.status, event.time, event.mode, event.reminderIds], ['applied', null, null, []]);
+  });
+
+  test('Version 3 → 4 legt die Foto-Tabelle an, Bewerbungen bleiben', async () => {
+    const { db, raw } = await makeDb();
+    raw.exec('DROP TABLE photos; PRAGMA user_version = 3;');
+    const id = await A.createApplication(db, newApplication({ company: 'Vorher' }));
+
+    await migrateDbIfNeeded(db);
+
+    assert.equal(userVersion(raw), LATEST_VERSION);
+    assert.equal((await A.getApplication(db, id))?.company, 'Vorher');
+    assert.deepEqual(await P.listPhotos(db, id), []);
   });
 
   test('Abbruch mitten in einer Migration hinterlässt keinen halben Stand', async () => {

@@ -5,9 +5,11 @@ import { type ReactNode, useCallback } from 'react';
 
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
 import { getAppearance } from '@/db/settings';
+import { removeOrphanPhotoFiles } from '@/features/photos/photoFiles';
 // Setzt beim Import, wie Erinnerungen bei offener App angezeigt werden.
 import '@/features/reminders/reminders';
 import { useReminderTaps } from '@/features/reminders/useReminderTaps';
+import { background } from '@/lib/background';
 import { useTheme } from '@/theme';
 import { AppearanceProvider, useAppearance, useResolvedScheme } from '@/theme/appearance';
 
@@ -32,6 +34,8 @@ function Database({ children }: { children: ReactNode }) {
     async (db: SQLiteDatabase) => {
       await migrateDbIfNeeded(db);
       setAppearance(await getAppearance(db));
+      // Reste aus verworfenen Formularen; darf den Start nie aufhalten.
+      background(removeOrphanPhotoFiles(db), 'Aufräumen der Fotos');
     },
     [setAppearance],
   );
@@ -71,6 +75,7 @@ function AppStack() {
           options={{ title: 'Neue Bewerbung', presentation: 'modal' }}
         />
         <Stack.Screen name="bewerbung/[id]" options={{ title: '' }} />
+        <Stack.Screen name="foto/[id]" options={{ title: 'Foto' }} />
         <Stack.Screen
           name="bewerbung/bearbeiten/[id]"
           options={{ title: 'Bewerbung bearbeiten', presentation: 'modal' }}

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRef } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import type { TextInput } from 'react-native';
 
@@ -30,6 +30,10 @@ type Props = {
   defaultValues: ApplicationFormValues;
   /** Beim Anlegen: Frage „Schon abgeschickt?“ zeigen */
   chooseStage?: boolean;
+  /** Fotos, die beim Anlegen gleich mitgespeichert werden */
+  photos?: ReactNode;
+  /** Ungespeichertes außerhalb des Formulars, z. B. neue Fotos */
+  extraDirty?: boolean;
   submitLabel: string;
   onSubmit: (values: ApplicationFormValues) => Promise<void>;
   /**
@@ -46,6 +50,8 @@ type Props = {
 export function ApplicationForm({
   defaultValues,
   chooseStage = false,
+  photos,
+  extraDirty = false,
   submitLabel,
   onSubmit,
   latestAppliedAt,
@@ -71,7 +77,7 @@ export function ApplicationForm({
 
   // Nach erfolgreichem Speichern darf die Seite ohne Rückfrage schließen.
   useDiscardGuard(
-    isDirty && !isSubmitSuccessful && !isSubmitting,
+    (isDirty || extraDirty) && !isSubmitSuccessful && !isSubmitting,
     'Die Bewerbung ist noch nicht gespeichert.',
   );
 
@@ -124,6 +130,12 @@ export function ApplicationForm({
               />
             )}
           />
+        </Field>
+      )}
+
+      {photos && (
+        <Field label="Foto der Anzeige" optional>
+          {photos}
         </Field>
       )}
 

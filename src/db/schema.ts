@@ -64,6 +64,18 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE status_events ADD COLUMN mode TEXT;
     ALTER TABLE status_events ADD COLUMN reminder_ids TEXT;
   `,
+
+  // Fotos, z. B. von der Stellenanzeige. Die Bilder selbst liegen als
+  // Dateien im App-Ordner, hier steht nur der Dateiname.
+  4: `
+    CREATE TABLE photos (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      application_id INTEGER NOT NULL REFERENCES applications (id) ON DELETE CASCADE,
+      file_name      TEXT NOT NULL UNIQUE,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_photos_application ON photos (application_id);
+  `,
 };
 
 export const LATEST_VERSION = Math.max(...Object.keys(MIGRATIONS).map(Number));

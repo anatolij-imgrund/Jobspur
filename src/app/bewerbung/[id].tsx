@@ -15,9 +15,13 @@ import {
   listStatusEvents,
   setReminderIds,
 } from '@/db/applications';
+import { addPhotos, listPhotos, type Photo } from '@/db/photos';
 import { type Fact, FactList, toHref } from '@/features/application-detail/FactList';
 import { StatusChanger } from '@/features/application-detail/StatusChanger';
 import { StatusTimeline } from '@/features/application-detail/StatusTimeline';
+import { photoUri, removeOrphanPhotoFiles } from '@/features/photos/photoFiles';
+import { PhotoStrip } from '@/features/photos/PhotoStrip';
+import { usePhotoPicker } from '@/features/photos/usePhotoPicker';
 import { cancelReminders, setUpInterviewReminders } from '@/features/reminders/reminders';
 import { background } from '@/lib/background';
 import { daysSince, formatDate, formatDaysAgo, formatWeekdayDate, toIsoDate } from '@/lib/dates';
@@ -40,6 +44,7 @@ type Loaded =
       application: Application;
       events: StatusEvent[];
       firstEventId: number | null;
+      photos: Photo[];
     };
 
 export default function BewerbungDetailScreen() {
@@ -55,12 +60,18 @@ export default function BewerbungDetailScreen() {
       setData({ state: 'missing' });
       return;
     }
-    const [events, firstEventId] = await Promise.all([
+    const [events, firstEventId, photos] = await Promise.all([
       listStatusEvents(db, id),
       getFirstStatusEventId(db, id),
+      listPhotos(db, id),
     ]);
-    setData({ state: 'ready', application, events, firstEventId });
+    setData({ state: 'ready', application, events, firstEventId, photos });
   }, [db, id]);
+
+  const picker = usePhotoPicker(async (fileNames) => {
+    await addPhotos(db, id, fileNames);
+    await load();
+  });
 
   // Auch nach dem Zurückkommen vom Bearbeiten neu laden.
   useFocusEffect(
@@ -84,7 +95,7 @@ export default function BewerbungDetailScreen() {
     );
   }
 
-  const { application: app, events, firstEventId } = data;
+  const { application: app, events, firstEventId, photos } = data;
   const days = daysSince(app.appliedAt);
   const lastEvent = events[0];
   // Nur „Beworben“ heißt wirklich: noch gar keine Rückmeldung.
@@ -139,6 +150,7 @@ export default function BewerbungDetailScreen() {
           onPress: async () => {
             const reminders = await deleteApplication(db, id);
             await cancelReminders(reminders);
+            background(removeOrphanPhotoFiles(db), 'Aufräumen der Fotos');
             router.back();
           },
         },
@@ -191,6 +203,21 @@ export default function BewerbungDetailScreen() {
         </View>
 
         <FactList facts={facts} />
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.ink }]}>Fotos</Text>
+          {photos.length === 0 && (
+            <Text style={[styles.hint, { color: theme.muted }]}>
+              Zum Beispiel von der Stellenanzeige. Die Fotos bleiben nur auf diesem Handy.
+            </Text>
+          )}
+          <PhotoStrip
+            photos={photos.map((p) => ({ key: String(p.id), uri: photoUri(p.fileName) }))}
+            busy={picker.busy}
+            onAdd={(source) => background(picker.add(source), 'Hinzufügen eines Fotos')}
+            onOpen={(key) => router.push({ pathname: '/foto/[id]', params: { id: key } })}
+          />
+        </View>
 
         {app.notes && (
           <View style={styles.section}>
@@ -277,6 +304,7 @@ const styles = StyleSheet.create({
   section: { gap: space.md },
   sectionTitle: type.heading,
   notes: { ...type.body, lineHeight: 22 },
+  hint: { ...type.small, lineHeight: 19, marginTop: -space.xs },
   delete: { alignSelf: 'flex-start', paddingVertical: space.sm },
   deleteText: { ...type.body, fontWeight: '500' },
 });
