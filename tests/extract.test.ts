@@ -190,6 +190,75 @@ www.rheinblick-versicherung.de/karriere`,
     const info = extractJobInfo(ocr('Systemadministrator (m/w/d)\nKöln, unbefristet\nDeine Aufgaben'));
     assert.equal(info.position, 'Systemadministrator (m/w/d)');
   });
+
+  test('Nexis: Nachbarkarte liefert keinen Ort, (m/ w/d) wird ordentlich', () => {
+    const info = extractJobInfo(
+      card([
+        ['NEXIS', 560, 90, 450],
+        ['(Junior) Software Developer Java EE', 715, 60, 275],
+        ['PHI', 715, 60, 1405],
+        ['(m/ w/d)', 790, 60, 275],
+        ['Re', 830, 30, 1460],
+        ['9 (Junior) Software Developer Java EE (m/w/d)', 900, 30, 285],
+        ['Direkteinstieg', 902, 22, 1110],
+        ['Ha', 870, 30, 1460],
+        ['H Nexis Group GmbH', 942, 30, 285],
+        ['Die NEXIS Plattform ist eine führende Identity Visibility and Intelligence Platform', 1005, 26, 280],
+      ]),
+    );
+    assert.equal(info.position, '(Junior) Software Developer Java EE (m/w/d)');
+    assert.equal(info.company, 'Nexis Group GmbH');
+    assert.equal(info.location, undefined);
+  });
+
+  test('Mühlbauer: Ort mit Hausnummer und PLZ, Abkürzung im Firmennamen bleibt', () => {
+    const info = extractJobInfo(
+      card([
+        ['Mühlbauer', 430, 70, 325],
+        ['High Tech International', 505, 36, 325],
+        ['Grafikdesigner & Content Creator', 600, 60, 150],
+        ['F', 600, 60, 1460],
+        ['(m/w/d)', 690, 60, 150],
+        ['9 Josef-Mühlbauer-Platz 1, 93426 Roding, Deutschland', 790, 30, 170],
+        ['Direkteinstieg', 790, 22, 1080],
+        ['H MB Automation GmbH & Co. KG', 840, 30, 170],
+        ['Bei F', 905, 26, 1430],
+        ['Als Grafikdesigner & Content Creator (m/w/d) bei der MB Automation GmbH & Co.', 905, 26, 170],
+        ['Deine Aufgaben', 1075, 28, 175],
+      ]),
+    );
+    assert.equal(info.position, 'Grafikdesigner & Content Creator (m/w/d)');
+    assert.equal(info.location, 'Roding');
+    assert.equal(info.company, 'MB Automation GmbH & Co. KG');
+  });
+
+  test('Hallo Welt: verlesenes „DIrektelnstieg“ ist kein Ort', () => {
+    const info = extractJobInfo(
+      card([
+        ['Frontend Software Developer -', 525, 60, 165],
+        ['Webstack (m/w/d)', 615, 60, 165],
+        ['DIrektelnstieg', 698, 22, 1080],
+        ['O Regensburg oder Hybrid', 700, 32, 180],
+      ]),
+    );
+    assert.equal(info.location, 'Regensburg oder Hybrid');
+  });
+
+  test('EVG: „(m/wlx)“ wird erkannt und berichtigt, zweite Titelzeile kein Ort', () => {
+    const info = extractJobInfo(
+      card([
+        ['C# Softwareentwickler (m/wlx)', 495, 62, 110],
+        ['Maschinensoftware', 590, 62, 110],
+        ['9 St. Florian am Inn/Schärding (OÖ, Nähe Passau)', 700, 32, 125],
+        ['DIrektelnstieg', 705, 22, 1100],
+        ['H EV Group GmbH', 750, 32, 125],
+        ['Nur Coden ist dir nicht genug? Du willst unsere Maschinen zum Leben erwecken,', 830, 26, 125],
+        ['Deine Aufgaben', 965, 28, 130],
+      ]),
+    );
+    assert.equal(info.position, 'C# Softwareentwickler (m/w/x) Maschinensoftware');
+    assert.equal(info.location, 'St. Florian am Inn/Schärding (OÖ, Nähe Passau)');
+  });
 });
 
 describe('Vorschläge zum Bestätigen', () => {

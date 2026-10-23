@@ -32,6 +32,17 @@ const LEGAL_FORM =
 const GENDER =
   /\(\s*(?:[mwdfx]\s*[/|,]\s*[mwdfx](?:\s*[/|,]\s*[mwdfx])?|all genders?|alle|gn\*?)\s*\)|\b[mwdf]\/[mwdf]\/[mwdfx]\b/i;
 
+/**
+ * Die Erkennung liest Schrägstriche gern als l, I oder 1 und streut
+ * Leerzeichen ein: „(m/wlx)“, „(m/ w/d)“. Vor allem anderen glattziehen.
+ */
+function normalizeGender(text: string): string {
+  return text.replace(
+    /\(\s*([mwdfx])\s*[/|lI1,]\s*([mwdfx])\s*[/|lI1,]\s*([mwdfx])\s*\)/gi,
+    (_, a: string, b: string, c: string) => `(${a}/${b}/${c})`.toLowerCase(),
+  );
+}
+
 const JOB_WORDS =
   /(entwickler|developer|engineer|informatiker|programmierer|administrator|admin\b|architekt|consultant|berater|analyst|manager|leiter|sachbearbeiter|kauf(mann|frau|leute)|techniker|mechatroniker|elektroniker|mitarbeiter|fachkraft|referent|assistenz|support|tester|designer|werkstudent|praktikum|praktikant|ausbildung|azubi|trainee|junior|senior)/i;
 
@@ -66,8 +77,11 @@ function stripIcon(text: string, everything: string): string {
     const [first, next] = words;
     const symbol = !/[\p{L}\p{N}]/u.test(first);
     const single = first.length === 1;
-    const short = first.length === 2 && /^[A-ZÄÖÜ]/.test(next) &&
-      everything.toLowerCase().split(next.toLowerCase()).length > 2;
+    // „Hi Hallo Welt!“: „Hallo“ steht auch anderswo, „Hi Hallo“ nicht → Symbol.
+    // „MB Automation“: steht genau so auch im Text → echte Abkürzung, bleibt.
+    const occurs = (phrase: string) => everything.toLowerCase().split(phrase.toLowerCase()).length - 1;
+    const short =
+      first.length === 2 && /^[A-ZÄÖÜ]/.test(next) && occurs(next) > 1 && occurs(`${first} ${next}`) < 2;
     if (!(symbol || single || short)) break;
     words = words.slice(1);
   }
@@ -181,7 +195,9 @@ const PLACE_CONNECTOR = /^(oder|und|bei|am|an|der|im|in|nähe|a\.|d\.|\/|&|\+|-|
 
 /** Sieht aus wie „Regensburg, Deggendorf“ oder „Köln oder Remote“. */
 function looksLikePlace(text: string): boolean {
-  if (!text || text.length > 70 || NOT_PLACE.test(text) || JOB_WORDS.test(text)) return false;
+  if (!text || text.length < 3 || text.length > 70 || JOB_WORDS.test(text)) return false;
+  // Auch verlesen: „DIrektelnstieg“ ist „Direkteinstieg“.
+  if (NOT_PLACE.test(text) || NOT_PLACE.test(text.replace(/[lI1|]/g, 'i'))) return false;
   if (LEGAL_FORM.test(text) || NOISE.test(text) || GENDER.test(text) || /\d/.test(text)) return false;
   // „Inn/Schärding“ zählt als zwei Wörter, Klammern und Kommas trennen nur.
   const words = text.replace(/[,()/]/g, ' ').split(/\s+/).filter(Boolean);
@@ -202,13 +218,24 @@ function findLocation(
     }
   }
   // Messe-Karten und Portale: Ort mit Pin-Symbol direkt unter dem Titel.
+  // Nur Zeilen, die links bündig darunter stehen (nicht die Nachbarkarte,
+  // nicht „Direkteinstieg“ rechts daneben) und kleiner sind als der Titel.
   if (position) {
-    const below = [...lines]
-      .filter((l) => l.top > position.line.top)
+    const title = position.line;
+    const below = lines
+      .filter((l) => l.top > title.top && l.height < title.height * 0.85)
+      .filter(
+        (l) =>
+          title.left === undefined ||
+          l.left === undefined ||
+          Math.abs(l.left - title.left) <= title.height * 3,
+      )
       .sort((a, b) => a.top - b.top)
-      .slice(0, 4);
+      .slice(0, 3);
     for (const line of below) {
       const text = stripIcon(line.text, everything);
+      const zip = ZIP_CITY.exec(text);
+      if (zip) return clean(zip[1]);
       if (looksLikePlace(text)) return text;
     }
   }
@@ -222,7 +249,9 @@ function findLocation(
 
 /** Zeilen in Lesereihenfolge: Erkennung liefert sie blockweise. */
 export function extractJobInfo(input: readonly OcrLine[]): JobInfo {
-  const lines = input.filter((l) => clean(l.text) !== '');
+  const lines = input
+    .map((l) => ({ ...l, text: normalizeGender(l.text) }))
+    .filter((l) => clean(l.text) !== '');
   const all = lines.map((l) => l.text).join('\n');
 
   const position = findPosition(lines);
