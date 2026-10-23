@@ -190,11 +190,13 @@ npx eas-cli@latest build -p android --profile production   # App Bundle für Goo
 
 ## Pläne
 
+- [x] Stellen vormerken, Fotos und Texterkennung (Version 1.1)
 - [ ] Veröffentlichung im Google Play Store
+- [ ] Version für iPhone
 - [ ] Erinnerung zum Nachfassen, wenn eine Bewerbung lange ohne Antwort bleibt
-- [ ] Monatsziel aus dem Kooperationsplan mit Fortschritt
 - [ ] Statistiken: Bewerbungen pro Monat, Antwortquote
-- [ ] Stellenanzeige als Link oder Foto übernehmen
+
+Was sich in welcher Version geändert hat, steht in [CHANGELOG.md](CHANGELOG.md).
 
 ## Über das Projekt
 
