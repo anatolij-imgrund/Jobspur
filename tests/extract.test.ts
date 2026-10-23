@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import { extractJobInfo, type OcrLine } from '@/features/photos/extractJobInfo';
+import { suggestionRows } from '@/features/photos/suggestions';
 
 /** Text wie von der Erkennung: eine Zeile pro Zeile, Überschriften größer. */
 function ocr(text: string, big: string[] = []): OcrLine[] {
@@ -188,5 +189,35 @@ www.rheinblick-versicherung.de/karriere`,
   test('ohne größere Überschrift wandert die nächste Zeile nicht in den Titel', () => {
     const info = extractJobInfo(ocr('Systemadministrator (m/w/d)\nKöln, unbefristet\nDeine Aufgaben'));
     assert.equal(info.position, 'Systemadministrator (m/w/d)');
+  });
+});
+
+describe('Vorschläge zum Bestätigen', () => {
+  const empty = { company: '', position: '', location: '', contactName: '', contactEmail: '', jobUrl: '' };
+
+  test('leere Felder sind vorausgewählt, in Reihenfolge des Formulars', () => {
+    const rows = suggestionRows({ location: 'Köln', company: 'Muster GmbH' }, empty);
+    assert.deepEqual(
+      rows.map((r) => [r.label, r.value, r.checked, r.replaces]),
+      [
+        ['Firma', 'Muster GmbH', true, null],
+        ['Ort', 'Köln', true, null],
+      ],
+    );
+  });
+
+  test('Getipptes wird nicht vorausgewählt ersetzt, Gleiches nicht angeboten', () => {
+    const rows = suggestionRows(
+      { company: 'Muster GmbH', position: 'Entwickler (m/w/d)' },
+      { ...empty, company: 'Muster GmbH ', position: 'Dev' },
+    );
+    assert.deepEqual(
+      rows.map((r) => [r.key, r.checked, r.replaces]),
+      [['position', false, 'Dev']],
+    );
+  });
+
+  test('nichts gefunden, nichts anzuzeigen', () => {
+    assert.deepEqual(suggestionRows({}, empty), []);
   });
 });

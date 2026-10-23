@@ -8,7 +8,7 @@ import { DateField } from '@/components/form/DateField';
 import { Field } from '@/components/form/Field';
 import { FormGroupTitle, FormLayout } from '@/components/form/FormLayout';
 import { TextField } from '@/components/form/TextField';
-import type { JobInfo } from '@/features/photos/extractJobInfo';
+import { SUGGESTION_FIELDS, type SuggestionKey } from '@/features/photos/suggestions';
 import { useDiscardGuard } from '@/hooks/useDiscardGuard';
 import { formatDate } from '@/lib/dates';
 import {
@@ -27,25 +27,18 @@ const STAGE_LABELS: Record<Stage, string> = {
   saved: 'Nein, erst vormerken',
 };
 
-/** Felder, die die Texterkennung vorschlagen darf, mit Namen für die Meldung. */
-const SUGGESTION_FIELDS: [keyof JobInfo, string][] = [
-  ['company', 'Firma'],
-  ['position', 'Stelle'],
-  ['location', 'Ort'],
-  ['contactName', 'Ansprechperson'],
-  ['contactEmail', 'E-Mail'],
-  ['jobUrl', 'Link'],
-];
+/** Zugriff auf die Felder, die die Texterkennung vorschlagen darf. */
+export type SuggestionTarget = {
+  current: () => Record<SuggestionKey, string>;
+  apply: (values: Partial<Record<SuggestionKey, string>>) => void;
+};
 
 type Props = {
   defaultValues: ApplicationFormValues;
   /** Beim Anlegen: Frage „Schon abgeschickt?“ zeigen */
   chooseStage?: boolean;
-  /**
-   * Fotofeld beim Anlegen. Bekommt eine Funktion, die Vorschläge aus der
-   * Texterkennung in leere Felder einträgt; zurück kommen die Feldnamen.
-   */
-  renderPhotos?: (applySuggestion: (info: JobInfo) => string[]) => ReactNode;
+  /** Fotofeld beim Anlegen; darf Vorschläge aus der Texterkennung eintragen. */
+  renderPhotos?: (target: SuggestionTarget) => ReactNode;
   /** Ungespeichertes außerhalb des Formulars, z. B. neue Fotos */
   extraDirty?: boolean;
   submitLabel: string;
@@ -91,17 +84,19 @@ export function ApplicationForm({
 
   const saved = useWatch({ control, name: 'stage' }) === 'saved';
 
-  // Was man schon selbst getippt hat, bleibt stehen.
-  const applySuggestion = (info: JobInfo): string[] => {
-    const filled: string[] = [];
-    for (const [key, label] of SUGGESTION_FIELDS) {
-      const value = info[key];
-      if (value && getValues(key).trim() === '') {
-        setValue(key, value, { shouldDirty: true, shouldValidate: true });
-        filled.push(label);
+  // Erst nach Bestätigung im Fenster „Auf dem Foto gefunden“.
+  const suggestionTarget: SuggestionTarget = {
+    current: () =>
+      Object.fromEntries(SUGGESTION_FIELDS.map(({ key }) => [key, getValues(key)])) as Record<
+        SuggestionKey,
+        string
+      >,
+    apply: (values) => {
+      for (const { key } of SUGGESTION_FIELDS) {
+        const value = values[key];
+        if (value !== undefined) setValue(key, value, { shouldDirty: true, shouldValidate: true });
       }
-    }
-    return filled;
+    },
   };
 
   // Nach erfolgreichem Speichern darf die Seite ohne Rückfrage schließen.
@@ -164,7 +159,7 @@ export function ApplicationForm({
 
       {renderPhotos && (
         <Field label="Foto der Anzeige" optional>
-          {renderPhotos(applySuggestion)}
+          {renderPhotos(suggestionTarget)}
         </Field>
       )}
 

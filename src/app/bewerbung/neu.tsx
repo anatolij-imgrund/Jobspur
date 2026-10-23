@@ -21,8 +21,8 @@ export default function NeueBewerbungScreen() {
       defaultValues={defaults}
       chooseStage
       extraDirty={photos.length > 0}
-      renderPhotos={(applySuggestion) => (
-        <NewPhotosField photos={photos} onChange={setPhotos} applySuggestion={applySuggestion} />
+      renderPhotos={(target) => (
+        <NewPhotosField photos={photos} onChange={setPhotos} target={target} />
       )}
       submitLabel="Bewerbung speichern"
       onSubmit={async (values) => {
