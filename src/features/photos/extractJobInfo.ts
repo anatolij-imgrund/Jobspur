@@ -47,49 +47,128 @@ const clean = (s: string) =>
 
 const isTooLong = (s: string, max: number) => s.length > max;
 
-/** Stellentitel: Zeile mit (m/w/d), sonst die größte Zeile mit einem Berufswort. */
-function findPosition(lines: OcrLine[]): string | undefined {
-  for (let i = 0; i < lines.length; i++) {
-    const text = clean(lines[i].text);
-    if (!GENDER.test(text)) continue;
-    // „(m/w/d)“ allein in einer Zeile gehört zur Zeile darüber.
-    const onlyGender = clean(text.replace(GENDER, '')) === '';
-    const title = onlyGender && i > 0 ? `${clean(lines[i - 1].text)} ${text}` : text;
-    if (!isTooLong(title, 160)) return clean(title);
+/**
+ * Symbole vor einer Zeile (Pin beim Ort, Haus bei der Firma) liest die
+ * Erkennung oft als Zeichen: „9 Regensburg“, „H Ferchau GmbH“, „Hi Hallo …“.
+ * Ein einzelnes Zeichen vorn fällt immer weg, zwei Zeichen nur, wenn das
+ * Wort danach auch anderswo auf der Anzeige steht.
+ */
+function stripIcon(text: string, everything: string): string {
+  let words = clean(text).split(' ');
+  while (words.length > 1) {
+    const [first, next] = words;
+    const symbol = !/[\p{L}\p{N}]/u.test(first);
+    const single = first.length === 1;
+    const short = first.length === 2 && /^[A-ZÄÖÜ]/.test(next) &&
+      everything.toLowerCase().split(next.toLowerCase()).length > 2;
+    if (!(symbol || single || short)) break;
+    words = words.slice(1);
   }
-  const candidates = lines
-    .map((l) => ({ ...l, text: clean(l.text) }))
-    .filter((l) => JOB_WORDS.test(l.text) && !NOISE.test(l.text) && !LEGAL_FORM.test(l.text))
-    .filter((l) => l.text.split(' ').length <= 8)
-    .sort((a, b) => b.height - a.height || a.top - b.top);
-  return candidates[0]?.text;
+  return words.join(' ');
 }
 
-/** Firma: erste Zeile mit Rechtsform, ohne Satz drumherum. */
-function findCompany(lines: OcrLine[]): string | undefined {
+/** Zeile direkt darüber mit ähnlich großer Schrift: Fortsetzung einer Überschrift. */
+function lineAbove(line: OcrLine, lines: readonly OcrLine[]): OcrLine | undefined {
+  return lines
+    .filter((l) => l !== line && l.top < line.top && line.top - l.top <= line.height * 1.8)
+    .filter((l) => l.height >= line.height * 0.7 && l.height <= line.height * 1.4)
+    .filter((l) => !GENDER.test(l.text) && !NOISE.test(clean(l.text)) && !LEGAL_FORM.test(l.text))
+    // Einleitende Sätze („… suchen wir:“) und Satzenden gehören nicht zum Titel.
+    .filter((l) => !/\b(suchen|sucht|wir)\b\W*$/i.test(l.text) && !/[.:!?]\s*$/.test(l.text))
+    .sort((a, b) => b.top - a.top)[0];
+}
+
+/** Zwei Zeilen eines Titels zusammenfügen, auch mit Silbentrennung. */
+function joinTitle(upper: string, lower: string): string {
+  if (/\s[-–]$/.test(upper)) return `${upper} ${lower}`;
+  if (/\p{L}-$/u.test(upper)) {
+    return /^[a-zäöüß]/.test(lower) ? upper.slice(0, -1) + lower : upper + lower;
+  }
+  return `${upper} ${lower}`;
+}
+
+type Position = { text: string; line: OcrLine };
+
+/** Stellentitel: Zeile mit (m/w/d) samt Zeilen darüber, sonst größte Zeile mit Berufswort. */
+function findPosition(lines: OcrLine[]): Position | undefined {
   for (const line of lines) {
-    const text = clean(line.text);
+    if (!GENDER.test(line.text)) continue;
+    let title = clean(line.text);
+    let current = line;
+    // Überschriften über zwei oder drei Zeilen; ein Logo darüber ist weiter weg.
+    for (let i = 0; i < 2; i++) {
+      const above = lineAbove(current, lines);
+      if (!above) break;
+      // Bindestrich am Ende behalten: Er entscheidet, wie die Zeilen zusammengehören.
+      const upper = above.text.replace(/\s+/g, ' ').replace(/^[\s•·*|:]+/, '').trim();
+      title = joinTitle(upper, title);
+      current = above;
+    }
+    if (!isTooLong(title, 160)) return { text: clean(title), line };
+  }
+  const candidate = lines
+    .map((l) => ({ line: l, text: clean(l.text) }))
+    .filter(({ text }) => JOB_WORDS.test(text) && !NOISE.test(text) && !LEGAL_FORM.test(text))
+    .filter(({ text }) => text.split(' ').length <= 8)
+    .sort((a, b) => b.line.height - a.line.height || a.line.top - b.line.top)[0];
+  return candidate;
+}
+
+/** Firma: erste Zeile mit Rechtsform, ohne Satz drumherum und ohne Symbol davor. */
+function findCompany(lines: OcrLine[], everything: string): string | undefined {
+  for (const line of lines) {
+    const text = stripIcon(line.text, everything);
     const match = LEGAL_FORM.exec(text);
     if (!match) continue;
-    // Bis einschließlich Rechtsform; davor stehende Füllwörter weg.
     let words = clean(text.slice(0, match.index + match[0].length)).split(' ');
     // In einem langen Satz nur die letzten Wörter vor der Rechtsform nehmen,
     // dann führende kleingeschriebene Wörter weg („die“, „sucht“, „bei der“).
     if (words.length > 6) words = words.slice(-5);
     const filler = /^(?:[a-zäöü].*|Die|Der|Das|Bei|Wir)$/;
     while (words.length > 2 && filler.test(words[0])) words = words.slice(1);
+    // Nur „GmbH“ (z. B. aus dem Logo) ist kein Firmenname.
+    if (words.length < 2) continue;
     const name = words.join(' ');
     if (name.length >= 3 && !isTooLong(name, 120)) return name;
   }
   return undefined;
 }
 
-function findLocation(lines: OcrLine[]): string | undefined {
+// Wörter, die neben dem Ort stehen, aber keiner sind
+const NOT_PLACE =
+  /\b(direkteinstieg|berufseinstieg|einstieg|vollzeit|teilzeit|karriere|benefits|festanstellung|unbefristet|befristet|minijob|ab sofort)\b/i;
+const PLACE_CONNECTOR = /^(oder|und|bei|am|an|der|im|in|a\.|d\.|\/|&|\+|-|–|hybrid|remote)$/i;
+
+/** Sieht aus wie „Regensburg, Deggendorf“ oder „Köln oder Remote“. */
+function looksLikePlace(text: string): boolean {
+  if (!text || text.length > 60 || NOT_PLACE.test(text) || JOB_WORDS.test(text)) return false;
+  if (LEGAL_FORM.test(text) || NOISE.test(text) || GENDER.test(text) || /\d/.test(text)) return false;
+  const words = text.replace(/[,()]/g, ' ').split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 6 || !/^[A-ZÄÖÜ]/.test(words[0])) return false;
+  return words.every((w) => /^[A-ZÄÖÜ][\p{L}.-]*$/u.test(w) || PLACE_CONNECTOR.test(w));
+}
+
+function findLocation(
+  lines: OcrLine[],
+  position: Position | undefined,
+  everything: string,
+): string | undefined {
   for (const line of lines) {
     const label = LOCATION_LABEL.exec(line.text);
     if (label) {
       const value = clean(label[1]);
       if (value && !isTooLong(value, 80)) return value;
+    }
+  }
+  // Messe-Karten und Portale: Ort mit Pin-Symbol direkt unter dem Titel.
+  if (position) {
+    const below = [...lines]
+      .filter((l) => l.top > position.line.top)
+      .sort((a, b) => a.top - b.top)
+      .slice(0, 4);
+    for (const line of below) {
+      const text = stripIcon(line.text, everything);
+      if (looksLikePlace(text)) return text;
     }
   }
   for (const line of lines) {
@@ -105,10 +184,11 @@ export function extractJobInfo(input: readonly OcrLine[]): JobInfo {
   const lines = input.filter((l) => clean(l.text) !== '');
   const all = lines.map((l) => l.text).join('\n');
 
+  const position = findPosition(lines);
   const info: JobInfo = {
-    company: findCompany(lines),
-    position: findPosition(lines),
-    location: findLocation(lines),
+    company: findCompany(lines, all),
+    position: position?.text,
+    location: findLocation(lines, position, all),
     contactName: CONTACT.exec(all)?.[0].replace(/^Fr\./, 'Frau').replace(/^Hr\./, 'Herr'),
     contactEmail: EMAIL.exec(all)?.[0].toLowerCase(),
     jobUrl: URL.exec(all)?.[0].replace(/[.)]+$/, ''),

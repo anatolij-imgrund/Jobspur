@@ -84,4 +84,74 @@ www.rheinblick-versicherung.de/karriere`,
     assert.equal(info.position, 'Kaufmann für Büromanagement (m/w/d)');
     assert.equal(info.jobUrl, 'https://example.org/job/42');
   });
+
+  // Nachbau echter Messe-Anzeigen, wie ML Kit sie liefert: Symbole vor Ort
+  // und Firma werden zu Störzeichen, Überschriften sind größer.
+  const card = (rows: [string, number, number][]): OcrLine[] =>
+    rows.map(([text, top, height], i) => ({ text, top, height, block: i }));
+
+  test('Messe-Karte: Titel einzeilig, Ort mit Pin, Firma mit Haus-Symbol', () => {
+    const info = extractJobInfo(
+      card([
+        ['MIN', 90, 30],
+        ['FERCHAU', 380, 90],
+        ['Softwareentwickler (m/w/d)', 575, 60],
+        ['9 Regensburg, Deggendorf', 695, 32],
+        ['Direkteinstieg', 695, 22],
+        ['H Ferchau GmbH', 745, 32],
+        ['Bei FERCHAU verbinden wir Menschen und Technologien und realisieren innova-', 820, 26],
+        ['Deine Aufgaben', 930, 28],
+        ['Entwicklung und Implementierung von Softwarelösungen', 980, 28],
+        ['Dein Profil', 1155, 28],
+        ['Studium der Informatik oder ähnliche Qualifikation', 1200, 28],
+      ]),
+    );
+    assert.equal(info.company, 'Ferchau GmbH');
+    assert.equal(info.position, 'Softwareentwickler (m/w/d)');
+    assert.equal(info.location, 'Regensburg, Deggendorf');
+  });
+
+  test('Messe-Karte: Titel über zwei Zeilen, Ort „oder Hybrid“', () => {
+    const info = extractJobInfo(
+      card([
+        ['Hallo Welt!', 280, 70],
+        ['GmbH', 380, 40],
+        ['Frontend Software Developer -', 525, 60],
+        ['Webstack (m/w/d)', 615, 60],
+        ['O Regensburg oder Hybrid', 700, 32],
+        ['Direkteinstieg', 700, 22],
+        ['Hi Hallo Welt! GmbH', 750, 32],
+        ['Die Hallo Welt! GmbH gehört zu den führenden Spezialisten für die Wikipedia-Soft-', 820, 26],
+        ['Deine Aufgaben', 985, 28],
+      ]),
+    );
+    assert.equal(info.position, 'Frontend Software Developer - Webstack (m/w/d)');
+    assert.equal(info.location, 'Regensburg oder Hybrid');
+    assert.equal(info.company, 'Hallo Welt! GmbH');
+  });
+
+  test('Einleitungssatz in gleicher Schrift wird nicht Teil der Stelle', () => {
+    const info = extractJobInfo(ocr('Für unseren Standort in Köln suchen wir\nSystemadministrator (m/w/d)'));
+    assert.equal(info.position, 'Systemadministrator (m/w/d)');
+  });
+
+  test('Logo über dem Titel wird nicht Teil der Stelle', () => {
+    const info = extractJobInfo(
+      card([
+        ['FERCHAU', 380, 90],
+        ['Softwareentwickler (m/w/d)', 575, 60],
+      ]),
+    );
+    assert.equal(info.position, 'Softwareentwickler (m/w/d)');
+  });
+
+  test('Silbentrennung im Titel: „Software-“ und „entwickler“ werden ein Wort', () => {
+    const info = extractJobInfo(
+      card([
+        ['Junior Software-', 500, 60],
+        ['entwickler (m/w/d)', 580, 60],
+      ]),
+    );
+    assert.equal(info.position, 'Junior Softwareentwickler (m/w/d)');
+  });
 });
