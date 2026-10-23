@@ -42,7 +42,9 @@ diesen Nachweis. Jobspur ist für die Jobsuche in Deutschland gebaut.
   <img src="docs/screenshots/termin.png" width="200" alt="Gesprächstermin mit Erinnerung eintragen">
   <img src="docs/screenshots/nachweis.png" width="200" alt="Nachweis erstellen">
   <img src="docs/screenshots/einstellungen.png" width="200" alt="Einstellungen mit Darstellung und Datensicherung">
+  <img src="docs/screenshots/fotoerkennung.png" width="200" alt="Funde aus dem Foto einer Musteranzeige zum Bestätigen">
 </p>
+<p align="center"><sub>Das letzte Bild zeigt eine erfundene Musteranzeige; das Vorschaubild ist verpixelt.</sub></p>
 
 ## Funktionen
 
