@@ -1,0 +1,6 @@
+{
+  "name": "text-recognition",
+  "version": "1.0.0",
+  "description": "Texterkennung mit Google ML Kit für Jobspur (nur Android)",
+  "private": true
+}

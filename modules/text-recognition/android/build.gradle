@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'de.jobspur.textrecognition'
+version = '1.0.0'
+
+android {
+  namespace "de.jobspur.textrecognition"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Texterkennung für lateinische Schrift; das Modell steckt in der App,
+  // funktioniert also offline und ohne Google-Play-Download.
+  implementation 'com.google.mlkit:text-recognition:16.0.1'
+}

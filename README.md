@@ -52,6 +52,8 @@ diesen Nachweis. Jobspur ist für die Jobsuche in Deutschland gebaut.
 - Stellen vormerken, z. B. von der Jobmesse: Sie zählen erst als Bewerbung,
   wenn die Unterlagen raus sind, und stehen bis dahin nicht im Nachweis
 - Fotos der Stellenanzeige anhängen, mit der Kamera oder aus der Galerie
+- Texterkennung auf dem Handy: Aus dem Foto schlägt die App Firma, Stelle,
+  Ort und Kontakt vor, ganz ohne Internet
 - Jede Rückmeldung als Eintrag im Verlauf: Eingang bestätigt, Gespräch,
   Zusage, Absage, keine Antwort
 - Nur sinnvolle Übergänge; nach Absage oder Zusage ist die Bewerbung abgeschlossen
@@ -108,6 +110,7 @@ sind nicht in der Sicherung, damit die Datei klein bleibt.
 | PDF | HTML-Vorlage, gerendert mit `expo-print`, geteilt mit `expo-sharing` |
 | Erinnerungen | lokale Benachrichtigungen mit `expo-notifications` |
 | Dateien | `expo-file-system` (Ordnerzugriff über das Android-Speicher-Framework) |
+| Texterkennung | eigenes Expo-Modul in Kotlin mit Google ML Kit, läuft offline auf dem Gerät |
 | Qualität | `node:test` gegen echtes SQLite, ESLint typgestützt, GitHub Actions |
 
 ## Architektur
@@ -123,6 +126,7 @@ src/
 ├── lib/          Datum, Benachrichtigungen, Hilfsfunktionen
 ├── theme/        Farben hell/dunkel, Abstände, Schrift
 └── types/        Datenmodell und Beschriftungen
+modules/          eigenes natives Modul: Texterkennung (Kotlin)
 tests/            Tests gegen echtes SQLite
 assets/source/    SVG-Quellen von Icon und Bildmarke
 ```
@@ -171,7 +175,8 @@ npm run lint        # ESLint
 
 > In Expo Go auf Android kann die App keinen eigenen Benachrichtigungskanal
 > anlegen und nutzt den Standardkanal; Erinnerungen kommen trotzdem an. Icon
-> und Startbildschirm sind erst in einem echten Build zu sehen.
+> und Startbildschirm sind erst in einem echten Build zu sehen, die
+> Texterkennung ebenso: Sie ist ein eigenes natives Modul und fehlt in Expo Go.
 
 ### App bauen
 

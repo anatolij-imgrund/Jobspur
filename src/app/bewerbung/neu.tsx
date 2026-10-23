@@ -6,10 +6,7 @@ import { createApplication } from '@/db/applications';
 import { addPhotos } from '@/db/photos';
 import { ApplicationForm } from '@/features/application-form/ApplicationForm';
 import { emptyFormValues, toNewApplication } from '@/features/application-form/schema';
-import { photoUri } from '@/features/photos/photoFiles';
-import { PhotoStrip } from '@/features/photos/PhotoStrip';
-import { usePhotoPicker } from '@/features/photos/usePhotoPicker';
-import { background } from '@/lib/background';
+import { NewPhotosField } from '@/features/photos/NewPhotosField';
 
 export default function NeueBewerbungScreen() {
   const db = useSQLiteContext();
@@ -18,21 +15,15 @@ export default function NeueBewerbungScreen() {
   // Schon im Foto-Ordner, aber noch ohne Bewerbung. Wird das Formular
   // verworfen, räumt die App die Dateien beim nächsten Start weg.
   const [photos, setPhotos] = useState<string[]>([]);
-  const picker = usePhotoPicker((fileNames) => setPhotos((prev) => [...prev, ...fileNames]));
 
   return (
     <ApplicationForm
       defaultValues={defaults}
       chooseStage
       extraDirty={photos.length > 0}
-      photos={
-        <PhotoStrip
-          photos={photos.map((name) => ({ key: name, uri: photoUri(name) }))}
-          busy={picker.busy}
-          onAdd={(source) => background(picker.add(source), 'Hinzufügen eines Fotos')}
-          onRemove={(name) => setPhotos((prev) => prev.filter((p) => p !== name))}
-        />
-      }
+      renderPhotos={(applySuggestion) => (
+        <NewPhotosField photos={photos} onChange={setPhotos} applySuggestion={applySuggestion} />
+      )}
       submitLabel="Bewerbung speichern"
       onSubmit={async (values) => {
         const id = await createApplication(db, toNewApplication(values), values.stage);

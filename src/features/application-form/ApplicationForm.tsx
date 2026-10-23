@@ -8,6 +8,7 @@ import { DateField } from '@/components/form/DateField';
 import { Field } from '@/components/form/Field';
 import { FormGroupTitle, FormLayout } from '@/components/form/FormLayout';
 import { TextField } from '@/components/form/TextField';
+import type { JobInfo } from '@/features/photos/extractJobInfo';
 import { useDiscardGuard } from '@/hooks/useDiscardGuard';
 import { formatDate } from '@/lib/dates';
 import {
@@ -26,12 +27,25 @@ const STAGE_LABELS: Record<Stage, string> = {
   saved: 'Nein, erst vormerken',
 };
 
+/** Felder, die die Texterkennung vorschlagen darf, mit Namen für die Meldung. */
+const SUGGESTION_FIELDS: [keyof JobInfo, string][] = [
+  ['company', 'Firma'],
+  ['position', 'Stelle'],
+  ['location', 'Ort'],
+  ['contactName', 'Ansprechperson'],
+  ['contactEmail', 'E-Mail'],
+  ['jobUrl', 'Link'],
+];
+
 type Props = {
   defaultValues: ApplicationFormValues;
   /** Beim Anlegen: Frage „Schon abgeschickt?“ zeigen */
   chooseStage?: boolean;
-  /** Fotos, die beim Anlegen gleich mitgespeichert werden */
-  photos?: ReactNode;
+  /**
+   * Fotofeld beim Anlegen. Bekommt eine Funktion, die Vorschläge aus der
+   * Texterkennung in leere Felder einträgt; zurück kommen die Feldnamen.
+   */
+  renderPhotos?: (applySuggestion: (info: JobInfo) => string[]) => ReactNode;
   /** Ungespeichertes außerhalb des Formulars, z. B. neue Fotos */
   extraDirty?: boolean;
   submitLabel: string;
@@ -50,7 +64,7 @@ type Props = {
 export function ApplicationForm({
   defaultValues,
   chooseStage = false,
-  photos,
+  renderPhotos,
   extraDirty = false,
   submitLabel,
   onSubmit,
@@ -65,6 +79,8 @@ export function ApplicationForm({
   const {
     control,
     handleSubmit,
+    getValues,
+    setValue,
     setError,
     formState: { errors, isDirty, isSubmitting, isSubmitSuccessful },
   } = useForm<ApplicationFormValues>({
@@ -74,6 +90,19 @@ export function ApplicationForm({
   });
 
   const saved = useWatch({ control, name: 'stage' }) === 'saved';
+
+  // Was man schon selbst getippt hat, bleibt stehen.
+  const applySuggestion = (info: JobInfo): string[] => {
+    const filled: string[] = [];
+    for (const [key, label] of SUGGESTION_FIELDS) {
+      const value = info[key];
+      if (value && getValues(key).trim() === '') {
+        setValue(key, value, { shouldDirty: true, shouldValidate: true });
+        filled.push(label);
+      }
+    }
+    return filled;
+  };
 
   // Nach erfolgreichem Speichern darf die Seite ohne Rückfrage schließen.
   useDiscardGuard(
@@ -133,9 +162,9 @@ export function ApplicationForm({
         </Field>
       )}
 
-      {photos && (
+      {renderPhotos && (
         <Field label="Foto der Anzeige" optional>
-          {photos}
+          {renderPhotos(applySuggestion)}
         </Field>
       )}
 
