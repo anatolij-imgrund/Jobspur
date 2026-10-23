@@ -6,7 +6,14 @@
  * Reine Funktionen ohne React Native, damit sie sich in Node testen lassen.
  */
 
-export type OcrLine = { text: string; top: number; height: number; block?: number };
+export type OcrLine = {
+  text: string;
+  top: number;
+  height: number;
+  /** Linke Kante; fehlt sie, gilt jede Zeile als bündig */
+  left?: number;
+  block?: number;
+};
 
 export type JobInfo = {
   company?: string;
@@ -67,15 +74,43 @@ function stripIcon(text: string, everything: string): string {
   return words.join(' ');
 }
 
-/** Zeile direkt darüber mit ähnlich großer Schrift: Fortsetzung einer Überschrift. */
+/**
+ * Kann `other` eine weitere Zeile derselben Überschrift sein wie `line`?
+ * Ähnlich groß, links bündig (sonst z. B. die Nachbarkarte auf dem Foto)
+ * und kein Satz, keine Rubrik, keine Firma.
+ */
+function sameHeading(line: OcrLine, other: OcrLine): boolean {
+  if (other.height < line.height * 0.7 || other.height > line.height * 1.4) return false;
+  if (line.left !== undefined && other.left !== undefined) {
+    if (Math.abs(line.left - other.left) > line.height * 1.5) return false;
+  }
+  const text = clean(other.text);
+  if (GENDER.test(text) || NOISE.test(text) || LEGAL_FORM.test(text)) return false;
+  // Einleitende Sätze („… suchen wir:“) und Satzenden gehören nicht zum Titel.
+  return !/\b(suchen|sucht|wir)\b\W*$/i.test(other.text) && !/[.:!?]\s*$/.test(other.text);
+}
+
+/** Abstand zur nächsten Zeile: mindestens eine halbe, höchstens knapp zwei Zeilen. */
+const lineGap = (upper: OcrLine, lower: OcrLine) =>
+  lower.top - upper.top >= lower.height * 0.5 && lower.top - upper.top <= lower.height * 1.8;
+
 function lineAbove(line: OcrLine, lines: readonly OcrLine[]): OcrLine | undefined {
   return lines
-    .filter((l) => l !== line && l.top < line.top && line.top - l.top <= line.height * 1.8)
-    .filter((l) => l.height >= line.height * 0.7 && l.height <= line.height * 1.4)
-    .filter((l) => !GENDER.test(l.text) && !NOISE.test(clean(l.text)) && !LEGAL_FORM.test(l.text))
-    // Einleitende Sätze („… suchen wir:“) und Satzenden gehören nicht zum Titel.
-    .filter((l) => !/\b(suchen|sucht|wir)\b\W*$/i.test(l.text) && !/[.:!?]\s*$/.test(l.text))
+    .filter((l) => l !== line && lineGap(l, line) && sameHeading(line, l))
     .sort((a, b) => b.top - a.top)[0];
+}
+
+/** Deutlich größer als der übliche Text auf dem Foto? */
+function isHeading(line: OcrLine, lines: readonly OcrLine[]): boolean {
+  const heights = lines.map((l) => l.height).sort((a, b) => a - b);
+  const median = heights[Math.floor(heights.length / 2)] ?? line.height;
+  return line.height >= median * 1.3;
+}
+
+function lineBelow(line: OcrLine, lines: readonly OcrLine[]): OcrLine | undefined {
+  return lines
+    .filter((l) => l !== line && lineGap(line, l) && sameHeading(line, l))
+    .sort((a, b) => a.top - b.top)[0];
 }
 
 /** Zwei Zeilen eines Titels zusammenfügen, auch mit Silbentrennung. */
@@ -87,6 +122,7 @@ function joinTitle(upper: string, lower: string): string {
   return `${upper} ${lower}`;
 }
 
+/** Der Titel und seine unterste Zeile; darunter steht oft der Ort. */
 type Position = { text: string; line: OcrLine };
 
 /** Stellentitel: Zeile mit (m/w/d) samt Zeilen darüber, sonst größte Zeile mit Berufswort. */
@@ -104,7 +140,11 @@ function findPosition(lines: OcrLine[]): Position | undefined {
       title = joinTitle(upper, title);
       current = above;
     }
-    if (!isTooLong(title, 160)) return { text: clean(title), line };
+    // … und selten eine Zeile darunter: „C# Softwareentwickler (m/w/x)“ / „Maschinensoftware“.
+    // Nur bei echten Überschriften, sonst landet z. B. „Köln, unbefristet“ im Titel.
+    const below = isHeading(line, lines) ? lineBelow(line, lines) : undefined;
+    if (below) title = `${title} ${clean(below.text)}`;
+    if (!isTooLong(title, 160)) return { text: clean(title), line: below ?? line };
   }
   const candidate = lines
     .map((l) => ({ line: l, text: clean(l.text) }))
@@ -137,14 +177,15 @@ function findCompany(lines: OcrLine[], everything: string): string | undefined {
 // Wörter, die neben dem Ort stehen, aber keiner sind
 const NOT_PLACE =
   /\b(direkteinstieg|berufseinstieg|einstieg|vollzeit|teilzeit|karriere|benefits|festanstellung|unbefristet|befristet|minijob|ab sofort)\b/i;
-const PLACE_CONNECTOR = /^(oder|und|bei|am|an|der|im|in|a\.|d\.|\/|&|\+|-|–|hybrid|remote)$/i;
+const PLACE_CONNECTOR = /^(oder|und|bei|am|an|der|im|in|nähe|a\.|d\.|\/|&|\+|-|–|hybrid|remote)$/i;
 
 /** Sieht aus wie „Regensburg, Deggendorf“ oder „Köln oder Remote“. */
 function looksLikePlace(text: string): boolean {
-  if (!text || text.length > 60 || NOT_PLACE.test(text) || JOB_WORDS.test(text)) return false;
+  if (!text || text.length > 70 || NOT_PLACE.test(text) || JOB_WORDS.test(text)) return false;
   if (LEGAL_FORM.test(text) || NOISE.test(text) || GENDER.test(text) || /\d/.test(text)) return false;
-  const words = text.replace(/[,()]/g, ' ').split(/\s+/).filter(Boolean);
-  if (words.length === 0 || words.length > 6 || !/^[A-ZÄÖÜ]/.test(words[0])) return false;
+  // „Inn/Schärding“ zählt als zwei Wörter, Klammern und Kommas trennen nur.
+  const words = text.replace(/[,()/]/g, ' ').split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 9 || !/^[A-ZÄÖÜ]/.test(words[0])) return false;
   return words.every((w) => /^[A-ZÄÖÜ][\p{L}.-]*$/u.test(w) || PLACE_CONNECTOR.test(w));
 }
 

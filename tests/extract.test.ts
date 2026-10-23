@@ -87,8 +87,8 @@ www.rheinblick-versicherung.de/karriere`,
 
   // Nachbau echter Messe-Anzeigen, wie ML Kit sie liefert: Symbole vor Ort
   // und Firma werden zu Störzeichen, Überschriften sind größer.
-  const card = (rows: [string, number, number][]): OcrLine[] =>
-    rows.map(([text, top, height], i) => ({ text, top, height, block: i }));
+  const card = (rows: [string, number, number, number?][]): OcrLine[] =>
+    rows.map(([text, top, height, left = 140], i) => ({ text, top, height, left, block: i }));
 
   test('Messe-Karte: Titel einzeilig, Ort mit Pin, Firma mit Haus-Symbol', () => {
     const info = extractJobInfo(
@@ -153,5 +153,40 @@ www.rheinblick-versicherung.de/karriere`,
       ]),
     );
     assert.equal(info.position, 'Junior Softwareentwickler (m/w/d)');
+  });
+
+  test('Nachbarkarte auf gleicher Höhe wird nicht an den Titel gehängt', () => {
+    const info = extractJobInfo(
+      card([
+        ['Frontend Software Developer -', 525, 60, 165],
+        ['Ju', 520, 60, 1430],
+        ['Webstack (m/w/d)', 615, 60, 165],
+        ['O Regensburg oder Hybrid', 700, 32, 180],
+      ]),
+    );
+    assert.equal(info.position, 'Frontend Software Developer - Webstack (m/w/d)');
+  });
+
+  test('Titel geht unter (m/w/x) weiter, Ort mit Schrägstrich und Klammer', () => {
+    const info = extractJobInfo(
+      card([
+        ['EVG', 380, 50, 150],
+        ['C# Softwareentwickler (m/w/x)', 495, 62, 110],
+        ['Maschinensoftware', 590, 62, 110],
+        ['9 St. Florian am Inn/Schärding (OÖ, Nähe Passau)', 700, 32, 125],
+        ['Direkteinstieg', 705, 22, 1100],
+        ['H EV Group GmbH', 750, 32, 125],
+        ['Nur Coden ist dir nicht genug? Du willst unsere Maschinen zum Leben erwecken,', 830, 26, 125],
+        ['Deine Aufgaben', 965, 28, 130],
+      ]),
+    );
+    assert.equal(info.position, 'C# Softwareentwickler (m/w/x) Maschinensoftware');
+    assert.equal(info.location, 'St. Florian am Inn/Schärding (OÖ, Nähe Passau)');
+    assert.equal(info.company, 'EV Group GmbH');
+  });
+
+  test('ohne größere Überschrift wandert die nächste Zeile nicht in den Titel', () => {
+    const info = extractJobInfo(ocr('Systemadministrator (m/w/d)\nKöln, unbefristet\nDeine Aufgaben'));
+    assert.equal(info.position, 'Systemadministrator (m/w/d)');
   });
 });
