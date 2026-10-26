@@ -61,8 +61,8 @@ Hell oder dunkel, ganz wie du magst.
 Hinweis: Jobspur ist ein privates Projekt und keine App der Bundesagentur für Arbeit, eines Jobcenters oder einer anderen Behörde. Ob ein Nachweis den Anforderungen deiner Stelle genügt, entscheidet diese Stelle.
 ```
 
-**Kategorie:** Produktivität
-**Tags:** Produktivität, Organisation, Karriere (soweit angeboten)
+**Kategorie:** Arbeit
+**Tags:** Arbeit, Organisation, Karriere (soweit angeboten)
 **E-Mail für Nutzer:** anatolij.imgrund@gmail.com
 **Website:** https://github.com/anatolij-imgrund/Jobspur
 **Datenschutzerklärung:** https://anatolij-imgrund.github.io/Jobspur/datenschutz.html
