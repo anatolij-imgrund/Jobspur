@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Datenschutz – Jobspur</title>
+<meta name="description" content="Datenschutzerklärung der App Jobspur: Alle Daten bleiben auf dem Handy.">
+<link rel="icon" href="icon.png">
+<style>
+  :root {
+    --bg: #F3F6F5; --surface: #FFFFFF; --ink: #17201D; --muted: #5F6F6A;
+    --line: #DCE3E0; --accent: #1F6B57; --accent-soft: #E1EEE9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1513; --surface: #18201D; --ink: #E6EEEB; --muted: #93A39E;
+      --line: #2A3531; --accent: #5EBFA3; --accent-soft: #1E3530;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  header img { width: 48px; height: 48px; border-radius: 12px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0; letter-spacing: -0.4px; }
+  .stand { color: var(--muted); margin: 4px 0 28px; font-size: 15px; }
+  h2 { font-size: 20px; margin: 36px 0 8px; }
+  p, ul { margin: 0 0 12px; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  .kurz {
+    background: var(--accent-soft); border-radius: 12px; padding: 16px 18px; margin: 0 0 8px;
+  }
+  .kurz p:last-child { margin-bottom: 0; }
+  .karte {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 18px; margin: 12px 0;
+  }
+  footer { margin-top: 48px; color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon.png" alt="">
+    <h1>Datenschutz bei Jobspur</h1>
+  </header>
+  <p class="stand">Stand: 26. Oktober 2026 · gilt für die Android-App Jobspur ab Version 1.1</p>
+
+  <div class="kurz">
+    <p><strong>Kurz gesagt:</strong> Alles, was du in Jobspur einträgst, bleibt auf deinem Handy.
+    Es gibt kein Konto, keinen Server des Entwicklers, keine Werbung und keine Auswertung
+    deines Verhaltens. Ich als Entwickler erhalte keine deiner Daten.</p>
+    <p>Die einzige Ausnahme ist technisch: Die Texterkennung von Google (ML Kit) schickt
+    Google technische Nutzungs- und Leistungsdaten. Deine Fotos und der erkannte Text sind
+    nicht dabei. Details stehen unten.</p>
+  </div>
+
+  <h2>Verantwortlich</h2>
+  <div class="karte">
+    <p>Anatolij Imgrund<br>
+    E-Mail: <a href="mailto:anatolij.imgrund@gmail.com">anatolij.imgrund@gmail.com</a></p>
+  </div>
+
+  <h2>Was die App speichert, und wo</h2>
+  <p>Jobspur speichert deine Einträge in einer Datenbank im privaten Speicher der App auf
+  deinem Handy. Andere Apps haben darauf keinen Zugriff. Dazu gehören:</p>
+  <ul>
+    <li>Bewerbungen: Firma, Stelle, Datum, Bewerbungsweg, Ort, Ansprechperson, E-Mail,
+      Link zur Anzeige, Notizen und der Verlauf mit Rückmeldungen und Gesprächsterminen</li>
+    <li>deine Angaben für den Nachweis: Name und Anschrift</li>
+    <li>Empfänger der Nachweise, z. B. Agentur für Arbeit oder Jobcenter, mit
+      Kundennummer und Anschrift</li>
+    <li>Fotos, die du an eine Bewerbung hängst (verkleinert, im privaten App-Ordner)</li>
+    <li>Einstellungen wie die Darstellung oder den Ordner für Sicherungen</li>
+  </ul>
+  <p>Die Daten bleiben gespeichert, bis du sie in der App löschst oder die App
+  deinstallierst. Beim Deinstallieren löscht Android alles, was zur App gehört.</p>
+
+  <h2>Berechtigungen</h2>
+  <ul>
+    <li><strong>Benachrichtigungen:</strong> nur für Erinnerungen an Gesprächstermine.
+      Die App fragt erst, wenn du eine Erinnerung einrichtest. Die Erinnerungen plant
+      dein Handy selbst, ohne Internet.</li>
+    <li><strong>Kamera:</strong> nur zum Fotografieren von Stellenanzeigen. Die App fragt
+      erst beim ersten Foto.</li>
+    <li><strong>Fotos aus der Galerie</strong> wählst du über die Bildauswahl von Android.
+      Die App sieht dabei nur die Bilder, die du auswählst.</li>
+    <li><strong>Ordner für Sicherungen:</strong> Die App darf nur in den Ordner schreiben,
+      den du selbst gewählt hast.</li>
+  </ul>
+  <p>Jobspur nutzt kein Mikrofon, keinen Standort und keine Kontakte.</p>
+
+  <h2>Texterkennung mit Google ML Kit</h2>
+  <p>Wenn du beim Anlegen einer Bewerbung ein Foto machst, liest die App den Text darauf
+  mit <a href="https://developers.google.com/ml-kit">ML Kit</a> von Google, um Firma,
+  Stelle und Ort vorzuschlagen. Das Erkennungsmodell ist in der App enthalten.
+  <strong>Bild und erkannter Text werden ausschließlich auf deinem Handy verarbeitet
+  und nicht an Google gesendet.</strong></p>
+  <p>ML Kit sendet jedoch technische Angaben an Google, mit denen Google die Erkennung
+  überwacht und verbessert: Angaben zum Gerät und zur App (z. B. Modell,
+  Android-Version, App-Version), eine zufällige Kennung pro Installation, die nicht dazu
+  gedacht ist, dich oder dein Gerät zu identifizieren, sowie Leistungswerte wie die
+  Dauer der Erkennung und Fehlercodes. Die Übertragung ist verschlüsselt. Google gibt
+  diese Daten nach eigener Aussage nicht an Dritte weiter. Ich als Entwickler sehe sie
+  nicht.</p>
+  <p>Grundlage ist das berechtigte Interesse an einer funktionierenden, stabilen
+  Texterkennung (Art. 6 Abs. 1 lit. f DSGVO). Wenn du das nicht möchtest, mach beim
+  Anlegen einfach kein Foto. Ohne Foto läuft keine Texterkennung. Mehr dazu:
+  <a href="https://developers.google.com/ml-kit/terms">Nutzungsbedingungen von ML Kit</a>,
+  <a href="https://developers.google.com/ml-kit/android-data-disclosure">Angaben von Google zur Datenerhebung</a>
+  und die <a href="https://policies.google.com/privacy">Datenschutzerklärung von Google</a>.</p>
+
+  <h2>Wenn du selbst etwas teilst</h2>
+  <p>Den Nachweis als PDF und die Datensicherung kannst du über das Teilen-Menü von Android
+  verschicken oder ablegen, z. B. per E-Mail oder in Google Drive. Das geschieht nur, wenn
+  du es auslöst. Für die weitere Verarbeitung gelten dann die Bedingungen des Dienstes,
+  den du wählst. Eine Sicherung enthält deine Einträge, aber keine Fotos.</p>
+
+  <h2>Deine Rechte</h2>
+  <p>Nach der DSGVO hast du das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung
+  der Verarbeitung, Datenübertragbarkeit und Widerspruch. Da deine Einträge nur auf deinem
+  Handy liegen, kannst du sie dort jederzeit selbst ansehen, ändern, exportieren und
+  löschen. Zu den Daten, die ML Kit an Google sendet, wende dich bitte an Google. Du hast
+  außerdem das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren.</p>
+
+  <h2>Keine offizielle App</h2>
+  <p>Jobspur ist ein privates Projekt und keine App der Bundesagentur für Arbeit, eines
+  Jobcenters oder einer anderen Behörde. Die App hat keine Verbindung zu deren Systemen.
+  Ob ein Nachweis den Anforderungen deiner Stelle genügt, entscheidet diese Stelle.</p>
+
+  <h2>Änderungen</h2>
+  <p>Ändert sich etwas an der App, das den Datenschutz betrifft, passe ich diese Seite an.
+  Das Datum oben zeigt den aktuellen Stand.</p>
+
+  <footer>
+    Jobspur · <a href="https://github.com/anatolij-imgrund/Jobspur">Projekt auf GitHub</a>
+  </footer>
+</main>
+</body>
+</html>

@@ -1,7 +1,8 @@
+import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ChoiceGroup } from '@/components/form/ChoiceGroup';
 import { Icon } from '@/components/Icon';
@@ -22,6 +23,8 @@ import {
   type Recipient,
   RECIPIENT_KIND_LABELS,
 } from '@/types/profile';
+
+const PRIVACY_URL = 'https://anatolij-imgrund.github.io/Jobspur/datenschutz.html';
 
 const APPEARANCE_LABELS: Record<Appearance, string> = {
   system: 'Wie das Handy',
@@ -156,6 +159,22 @@ export default function EinstellungenScreen() {
       </View>
 
       <BackupSection onRestored={load} />
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.ink }]}>Über Jobspur</Text>
+        <Text style={[styles.intro, { color: theme.muted }]}>
+          Version {Constants.expoConfig?.version ?? '–'}. Ein privates Projekt, keine App der
+          Bundesagentur für Arbeit oder eines Jobcenters. Deine Daten bleiben auf diesem Handy.
+        </Text>
+        <Pressable
+          onPress={() => background(Linking.openURL(PRIVACY_URL), 'Öffnen der Datenschutzerklärung')}
+          accessibilityRole="link"
+          hitSlop={8}
+          style={styles.link}
+        >
+          <Text style={[styles.action, { color: theme.accent }]}>Datenschutzerklärung</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
@@ -188,4 +207,5 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   addText: { ...type.body, fontWeight: '600' },
+  link: { alignSelf: 'flex-start', paddingVertical: space.xs },
 });

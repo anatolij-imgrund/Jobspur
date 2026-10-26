@@ -90,9 +90,13 @@ diesen Nachweis. Jobspur ist für die Jobsuche in Deutschland gebaut.
 
 ## Datenschutz
 
-Alle Daten bleiben auf dem Handy. Jobspur hat **kein Konto, keinen Server,
-kein Tracking und keine Werbung**. Die App fragt nur nach zwei
-Berechtigungen, und zwar erst, wenn man die Funktion nutzt: Benachrichtigungen
+Alle Daten bleiben auf dem Handy. Jobspur hat **kein Konto, keinen Server
+und keine Werbung**, und ich als Entwickler erhalte keine Daten. Einzige
+Ausnahme: Die Texterkennung (Google ML Kit) sendet Google technische
+Nutzungs- und Leistungsdaten; Fotos und erkannter Text bleiben auf dem Handy.
+Details in der [Datenschutzerklärung](https://anatolij-imgrund.github.io/Jobspur/datenschutz.html).
+
+Die App fragt nur nach zwei Berechtigungen, und zwar erst, wenn man die Funktion nutzt: Benachrichtigungen
 für die Erinnerung an ein Gespräch und die Kamera für Fotos von
 Stellenanzeigen. Fotos aus der Galerie wählt man über die Bildauswahl von
 Android, ohne Zugriff auf alle Bilder.
